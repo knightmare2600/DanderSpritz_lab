@@ -56,6 +56,15 @@ proxmox_lab_bridge: "vmbr40"
 # windowsPE pass so Setup can see a virtio-scsi disk.
 proxmox_virtio_iso: "virtio-win.iso"
 
+# Which VMs build.yml acts on. Empty or "all" = every VM in lab_vms (the
+# default). Override on the command line to build a subset without editing this
+# file, e.g.:
+#   ansible-playbook build.yml -e lab_vm_filter=danderspritz
+#   ansible-playbook build.yml -e lab_vm_filter=dc,target
+# Accepts a comma-separated string or a YAML/JSON list. Names must match
+# lab_vms[].name; an unknown name fails the run early.
+lab_vm_filter: "all"
+
 # ---------------------------------------------------------------------------
 # Per-VM definitions consumed by build.yml -> role: proxmox_vm.
 # iso = the Windows install media, pre-staged into proxmox_iso_storage.

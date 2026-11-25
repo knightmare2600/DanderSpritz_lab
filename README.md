@@ -249,14 +249,16 @@ small Debian LXC/VM with a NIC on `vmbr40`.
 4. **Point the playbook at your node** in `group_vars/all.yml`
    (`proxmox_api_host`, `proxmox_node`, storage names, `proxmox_lab_bridge`,
    `proxmox_virtio_iso`). The ISO filenames already match the table above.
-5. **Build one VM first** to prove virtio + WinRM (comment out `dc`/`target` in
-   `lab_vms`): `ansible-playbook build.yml --ask-vault-pass`, watch the console.
-   If Setup can't find the disk, fix `virtio_winpe_drive` in
-   `roles/proxmox_vm/defaults/main.yml`. Then
+5. **Build one VM first** to prove virtio + WinRM, using `lab_vm_filter` to pick
+   just the Win10 box (no file editing):
+   `ansible-playbook build.yml -e lab_vm_filter=danderspritz --ask-vault-pass`,
+   and watch the console. If Setup can't find the disk, fix `virtio_winpe_drive`
+   in `roles/proxmox_vm/defaults/main.yml`. Then
    `ansible-playbook configure.yml --limit danderspritz --ask-vault-pass`.
-6. **Build everything:** restore `lab_vms` and run
-   `ansible-playbook site.yml --ask-vault-pass`. Order is handled: all VMs
-   built, then common prep → DC promoted → target joins domain → DSZ box.
+6. **Build everything:** `ansible-playbook site.yml --ask-vault-pass`
+   (`lab_vm_filter` defaults to `all`). Order is handled: all VMs built, then
+   common prep → DC promoted → target joins domain → DSZ box. Build a subset any
+   time with `-e lab_vm_filter=dc,target`.
 7. **Acceptance test:** the FuzzBunch → EternalBlue → DoublePulsar → PeddleCheap
    walkthrough below — that proves the lab, not just a green playbook run.
 

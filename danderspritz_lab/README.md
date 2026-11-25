@@ -64,6 +64,16 @@ ansible-playbook configure.yml --ask-vault-pass --limit target
 Build is idempotent: a VM whose `vmid` already exists is left alone. To rebuild,
 destroy it in Proxmox first.
 
+**Build a subset** with `lab_vm_filter` (default `all`) — a comma-separated list
+of `lab_vms` names, no file editing:
+
+```bash
+ansible-playbook build.yml -e lab_vm_filter=danderspritz --ask-vault-pass   # one box
+ansible-playbook build.yml -e lab_vm_filter=dc,target     --ask-vault-pass   # a couple
+```
+
+An unknown name fails the run early with the list of valid names.
+
 ## Known rough edges (read before first run)
 
 These are the parts that genuinely differ from VirtualBox and are most likely to

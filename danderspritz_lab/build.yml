@@ -2,26 +2,56 @@
 # Phase 1 — create the three VMs on Proxmox from pre-staged ISOs + answer files.
 # Runs on the control node and talks to the Proxmox API. The guests do NOT yet
 # exist in the inventory sense, so everything here is delegated to localhost and
-# loops over lab_vms.
+# loops over the selected VMs.
+#
+# Build a subset with -e lab_vm_filter=... (see group_vars/all.yml). Default
+# ("all" / empty) builds every VM in lab_vms.
 - name: Build DanderSpritz lab VMs on Proxmox
   hosts: localhost
   gather_facts: false
   vars_files:
     - group_vars/vault.yml
+  vars:
+    # Normalise lab_vm_filter to a list of names, whether it arrives as a
+    # comma-separated string (-e lab_vm_filter=dc,target) or a real list.
+    _vm_filter_list: >-
+      {{ lab_vm_filter
+         if (lab_vm_filter is sequence and lab_vm_filter is not string)
+         else ((lab_vm_filter | string).split(',') | map('trim') | reject('equalto', '') | list) }}
+    # Empty or containing "all" -> every VM; otherwise only the named ones.
+    _selected_vms: >-
+      {{ lab_vms
+         if (_vm_filter_list | length == 0 or 'all' in _vm_filter_list)
+         else (lab_vms | selectattr('name', 'in', _vm_filter_list) | list) }}
   tasks:
-    - name: Provision each lab VM
+    - name: "Catch an unknown name in lab_vm_filter before building anything"
+      ansible.builtin.assert:
+        that:
+          - _vm_filter_list | difference(lab_vms | map(attribute='name') | list) | length == 0
+        fail_msg: >-
+          lab_vm_filter has name(s) not in lab_vms:
+          {{ _vm_filter_list | difference(lab_vms | map(attribute='name') | list) }}.
+          Valid names: {{ lab_vms | map(attribute='name') | list }}.
+      when: _vm_filter_list | length > 0 and 'all' not in _vm_filter_list
+
+    - name: "Report which VMs this run will build"
+      ansible.builtin.debug:
+        msg: "Building: {{ _selected_vms | map(attribute='name') | list }}"
+
+    - name: Provision each selected lab VM
       ansible.builtin.include_role:
         name: proxmox_vm
-      loop: "{{ lab_vms }}"
+      loop: "{{ _selected_vms }}"
       loop_control:
         loop_var: vm
+        label: "{{ vm.name }}"
 
-    - name: Wait for WinRM to come up on every guest
+    - name: Wait for WinRM to come up on every selected guest
       ansible.builtin.wait_for:
         host: "{{ item.ip }}"
         port: 5985
         timeout: 2400   # unattended install + first-logon WinRM setup
         sleep: 15
-      loop: "{{ lab_vms }}"
+      loop: "{{ _selected_vms }}"
       loop_control:
         label: "{{ item.name }} ({{ item.ip }})"
