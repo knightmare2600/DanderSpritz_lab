@@ -1,0 +1,27 @@
+---
+# Phase 1 — create the three VMs on Proxmox from pre-staged ISOs + answer files.
+# Runs on the control node and talks to the Proxmox API. The guests do NOT yet
+# exist in the inventory sense, so everything here is delegated to localhost and
+# loops over lab_vms.
+- name: Build DanderSpritz lab VMs on Proxmox
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - group_vars/vault.yml
+  tasks:
+    - name: Provision each lab VM
+      ansible.builtin.include_role:
+        name: proxmox_vm
+      loop: "{{ lab_vms }}"
+      loop_control:
+        loop_var: vm
+
+    - name: Wait for WinRM to come up on every guest
+      ansible.builtin.wait_for:
+        host: "{{ item.ip }}"
+        port: 5985
+        timeout: 2400   # unattended install + first-logon WinRM setup
+        sleep: 15
+      loop: "{{ lab_vms }}"
+      loop_control:
+        label: "{{ item.name }} ({{ item.ip }})"

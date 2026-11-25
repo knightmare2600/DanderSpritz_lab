@@ -1,0 +1,15 @@
+---
+# WinRM connection settings for every host in the `windows` group.
+# These match what the answer files configure on first logon (HTTP/5985,
+# AllowUnencrypted + Basic). Fine for an isolated lab; for anything else switch
+# to HTTPS/5986 with a cert and transport: ntlm/credssp.
+ansible_connection: winrm
+ansible_user: "{{ lab_admin_user }}"
+ansible_password: "{{ lab_admin_password }}"
+ansible_port: 5985
+ansible_winrm_scheme: http
+ansible_winrm_transport: basic
+ansible_winrm_server_cert_validation: ignore
+# Old Windows + long installs: don't let the read time out mid-operation.
+ansible_winrm_read_timeout_sec: 300
+ansible_winrm_operation_timeout_sec: 250

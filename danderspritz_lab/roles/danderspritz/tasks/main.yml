@@ -1,0 +1,38 @@
+---
+# Windows 10 (1507) DanderSpritz / FuzzBunch workstation. Mirrors the Packer
+# Win10 build: hardening-off + telemetry-off, then the toolchain (Git, JRE6,
+# Python, WinPython, DanderSpritz) and the D: virtual drive it runs from.
+
+- name: "DSZ | low-security settings and debloat"
+  ansible.builtin.include_role:
+    name: common_windows
+    tasks_from: run_ps_scripts
+  vars:
+    ps_scripts:
+      - "Win10\\Set-PowerSettings.ps1"
+      - "Win10\\Set-WindowsTelemetrySettings.ps1"
+      - "Win10\\Set-LowSecurityWindowsDefenderAntiVirusSettings.ps1"
+      - "Win10\\Set-LowSecurityWindowsDefenderSmartScreenSettings.ps1"
+      - "Win10\\Remove-PreInstalledApps.ps1"
+
+- name: "DSZ | reboot after defender / telemetry changes"
+  ansible.windows.win_reboot:
+    reboot_timeout: 900
+
+- name: "DSZ | install the DanderSpritz toolchain"
+  ansible.builtin.include_role:
+    name: common_windows
+    tasks_from: run_ps_scripts
+  vars:
+    ps_scripts:
+      - "Install-Git.ps1"
+      - "Win10\\Install-jre6u21.ps1"
+      - "Win10\\Install-python.ps1"
+      - "Win10\\Install-winpy32.ps1"
+      - "Win10\\Install-DanderSpritz.ps1"
+      - "autologon.ps1"
+      - "Win10\\virtual-drive.ps1"
+
+- name: "DSZ | final reboot"
+  ansible.windows.win_reboot:
+    reboot_timeout: 900

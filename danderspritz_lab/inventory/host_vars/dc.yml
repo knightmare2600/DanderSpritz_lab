@@ -1,0 +1,5 @@
+---
+# Windows Server 2008 R2 domain controller.
+# After promotion the local `vagrant` account becomes a domain account. If WinRM
+# basic auth fails post-promotion, uncomment the domain-qualified user:
+# ansible_user: "windomain\\vagrant"

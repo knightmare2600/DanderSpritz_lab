@@ -1,0 +1,9 @@
+---
+# Full lab from scratch: build the VMs on Proxmox, then configure the guests.
+#
+#   ansible-playbook site.yml --ask-vault-pass
+#
+# Re-run safely: build.yml is idempotent (skips VMs that already exist) and
+# configure.yml re-applies guest state.
+- import_playbook: build.yml
+- import_playbook: configure.yml

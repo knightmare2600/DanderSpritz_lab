@@ -1,0 +1,99 @@
+---
+# ---------------------------------------------------------------------------
+# Lab-wide facts. Single source of truth for the network, domain and creds.
+# ---------------------------------------------------------------------------
+
+# Where the original scripts/answer_files live (one level up from this playbook).
+lab_repo_root: "{{ playbook_dir }}/.."
+windows_scripts_dir: "{{ lab_repo_root }}/scripts"
+answer_files_dir: "{{ lab_repo_root }}/answer_files"
+
+# On-guest staging directory the scripts are copied to before they run.
+guest_stage_dir: 'C:\lab'
+
+# --- Network -----------------------------------------------------------------
+lab_domain: windomain.local
+lab_netbios: WINDOMAIN
+lab_subnet: "192.168.40"
+lab_netmask: 24
+lab_gateway: "192.168.40.1"
+lab_dc_ip: "192.168.40.2"
+lab_target_ip: "192.168.40.3"
+lab_dsz_ip: "192.168.40.4"
+# Upstream resolvers used by hosts that are not the DC.
+lab_dns_upstream:
+  - "1.1.1.1"
+  - "8.8.8.8"
+
+# --- Credentials -------------------------------------------------------------
+# NOTE: these are the lab's intentionally-weak default creds (vagrant:vagrant),
+# matching the answer files. The lab is deliberately vulnerable and must stay on
+# an isolated network. Override lab_admin_password in vault for anything less
+# throwaway than a scratch lab.
+lab_admin_user: vagrant
+lab_admin_password: vagrant
+
+# ---------------------------------------------------------------------------
+# Proxmox connection + VM placement. Secrets come from vault (see
+# group_vars/vault.yml.example); never commit real tokens.
+# ---------------------------------------------------------------------------
+proxmox_api_host: "proxmox.lab.local"
+proxmox_api_user: "root@pam"
+proxmox_api_token_id: "ansible"
+# proxmox_api_token_secret: defined in vault.yml
+proxmox_node: "pve"
+proxmox_validate_certs: false
+
+# Storage that already holds the pre-staged ISOs and will hold VM disks.
+proxmox_iso_storage: "local"       # content type: iso
+proxmox_disk_storage: "local-lvm"  # content type: images
+
+# Isolated bridge for the lab network. Create this on the node first; it must
+# NOT be bridged to anything you care about.
+proxmox_lab_bridge: "vmbr40"
+
+# virtio-win driver ISO, pre-staged into proxmox_iso_storage. Injected into the
+# windowsPE pass so Setup can see a virtio-scsi disk.
+proxmox_virtio_iso: "virtio-win.iso"
+
+# ---------------------------------------------------------------------------
+# Per-VM definitions consumed by build.yml -> role: proxmox_vm.
+# iso = the Windows install media, pre-staged into proxmox_iso_storage.
+# os_short = key into the per-OS virtio driver paths (see proxmox_vm defaults).
+# ---------------------------------------------------------------------------
+lab_vms:
+  - name: dc
+    vmid: 940
+    iso: "7601.17514.101119-1850_x64fre_server_eval_en-us-GRMSXEVAL_EN_DVD.iso"
+    answer_file: "2008_r2/Autounattend.xml"
+    os_short: "2k8R2"
+    ostype: "win7"           # Proxmox qm ostype (no w2008r2 key; win7 era)
+    memory: 2048
+    cores: 2
+    disk_gb: 40
+    ip: "{{ lab_dc_ip }}"
+    computer_name: "dc"
+
+  - name: target
+    vmid: 941
+    iso: "7600.16385.090713-1255_x64fre_enterprise_en-us_EVAL_Eval_Enterprise-GRMCENXEVAL_EN_DVD.iso"
+    answer_file: "7/Autounattend.xml"
+    os_short: "w7"
+    ostype: "win7"
+    memory: 2048
+    cores: 2
+    disk_gb: 40
+    ip: "{{ lab_target_ip }}"
+    computer_name: "target"
+
+  - name: danderspritz
+    vmid: 942
+    iso: "10240.16384.150709-1700.TH1_CLIENTENTERPRISEEVAL_OEMRET_X64FRE_EN-US.ISO"
+    answer_file: "10/Autounattend.xml"
+    os_short: "w10"
+    ostype: "win10"
+    memory: 4096
+    cores: 2
+    disk_gb: 60
+    ip: "{{ lab_dsz_ip }}"
+    computer_name: "danderspritz10"

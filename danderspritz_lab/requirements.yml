@@ -1,0 +1,17 @@
+---
+# Install with: ansible-galaxy collection install -r requirements.yml
+collections:
+  # Proxmox VE VM lifecycle (proxmox_kvm, proxmox_disk, etc.)
+  - name: community.general
+    version: ">=8.0.0"
+  # Windows modules run over WinRM (win_shell, win_copy, win_reboot, win_feature...)
+  - name: ansible.windows
+    version: ">=2.0.0"
+  # Extra Windows modules (win_domain, win_domain_membership, win_domain_controller...)
+  - name: microsoft.ad
+    version: ">=1.5.0"
+  # win_firewall_rule, win_chocolatey and friends
+  - name: community.windows
+    version: ">=2.0.0"
+  - name: chocolatey.chocolatey
+    version: ">=1.5.0"
