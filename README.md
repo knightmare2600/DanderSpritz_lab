@@ -147,6 +147,126 @@ You'll have to reboot the machine.
 
 ---
 
+## Building on Proxmox VE with Ansible (no Vagrant/Packer)
+
+If you run Proxmox VE rather than VirtualBox, the `danderspritz_lab/` directory
+contains an Ansible port that builds the same three-host lab directly on a PVE
+node. Vagrant and Packer are **not** required. The full reference lives in
+[`danderspritz_lab/README.md`](danderspritz_lab/README.md); this is the summary.
+
+### What's going on
+
+The original pipeline is two stages — Packer installs the OSes from ISO and
+bakes Vagrant boxes, then Vagrant boots them and provisions over WinRM. The
+Proxmox port keeps the **same split** but swaps the tools:
+
+* **`build.yml` → `roles/proxmox_vm`** creates each VM through the Proxmox API
+  (`community.general.proxmox_kvm`) from the **same Windows ISOs**, building a
+  tiny per-VM answer-file ISO and attaching the `virtio-win` ISO.
+* The existing **`answer_files/`** are reused untouched as the source: they are
+  rendered as templates with two things injected — virtio `DriverPaths` in the
+  `windowsPE` pass (so Setup sees a virtio-scsi disk) and a static-IP
+  first-logon command (there is no DHCP on the isolated lab bridge, so each
+  guest self-assigns its address before Ansible connects).
+* **`configure.yml` → roles** run the existing **`scripts/*.ps1`** over WinRM in
+  the original order and with the original reboots. VirtualBox guest additions
+  become `qemu-guest-agent`; the Packer floppy/OpenSSH bootstrap is dropped
+  because the answer files already enable WinRM on first logon.
+
+### Required ISOs and checksums
+
+The ISOs are **exactly the same** as the Packer build — the edition string must
+match the `/IMAGE/NAME` in each answer file, and the Windows 7 target must be
+the RTM build so the SP1-and-specific-KB patch chain (and unpatched SMBv1 for
+EternalBlue) is reproduced. Microsoft no longer hosts these; the Internet
+Archive does. **Verify every download against the checksum before use.**
+
+| Host | ISO filename | Archive.org |
+|------|--------------|-------------|
+| DC (Server 2008 R2 SP1, x64) | `7601.17514.101119-1850_x64fre_server_eval_en-us-GRMSXEVAL_EN_DVD.iso` | [wserver2008r2](https://archive.org/details/wserver2008r2) |
+| Target (Windows 7 Enterprise RTM, x64) | `7600.16385.090713-1255_x64fre_enterprise_en-us_EVAL_Eval_Enterprise-GRMCENXEVAL_EN_DVD.iso` | [windows-7-trial-iso](https://archive.org/details/windows-7-trial-iso) |
+| DanderSpritz (Windows 10 1507 Enterprise Eval, x64) | `10240.16384.150709-1700.TH1_CLIENTENTERPRISEEVAL_OEMRET_X64FRE_EN-US.ISO` | [10240 TH1 x64 en-us](https://archive.org/details/10240.16384.150709-1700.-th-1-cliententerpriseeval-oemret-x-64-fre-en-us) |
+
+| Host | MD5 | SHA-1 | SHA-256 |
+|------|-----|-------|---------|
+| DC | `4263be2cf3c59177c45085c0a7bc6ca5` | `beed231a34e90e1dd9a04b3afabec31d62ce3889` | `30832ad76ccfa4ce48ccb936edefe02079d42fb1da32201bf9e3a880c8ed6312` |
+| Target | `1d0d239a252cb53e466d39e752b17c28` | _compute & verify locally_ † | _compute & verify locally_ † |
+| DanderSpritz | _compute & verify locally_ † | `56ab095075be28a90bc0b510835280975c6bb2ce` | _compute & verify locally_ † |
+
+The DC row is confirmed against two independent sources (rg-adguard and
+HashiCorp's Packer documentation). The filled Target/DanderSpritz values are the
+project's own pinned checksums. **†** The remaining cells are deliberately left
+blank rather than filled with an unverified value: once your download matches
+the known hash above, compute the rest locally — that file is then your source
+of truth.
+
+```bash
+# verify the known hashes, then capture the others for your records
+md5sum    7601.17514*.iso    # == 4263be2cf3c59177c45085c0a7bc6ca5
+sha256sum 7601.17514*.iso    # == 30832ad76ccfa4ce48ccb936edefe02079d42fb1da32201bf9e3a880c8ed6312
+md5sum    7600.16385*.iso    # == 1d0d239a252cb53e466d39e752b17c28
+sha1sum   10240.16384*.iso   # == 56ab095075be28a90bc0b510835280975c6bb2ce
+sha256sum 7600.16385*.iso 10240.16384*.iso   # record these for the table
+```
+
+### Network topology — read this first
+
+The box running Ansible (the *control node*) must reach **both** the Proxmox API
+(`:8006`) **and** the three guests at `192.168.40.2/3/4` over WinRM (5985). The
+guests also need **outbound** internet during the build (Chocolatey, the
+DanderSpritz/JRE/Python/FLARE downloads), so the lab bridge needs a NAT gateway
+at `192.168.40.1`. "Isolated" means no *inbound* from networks you care about —
+not air-gapped.
+
+Simplest working setup: run Ansible from the PVE host, give the lab bridge the
+gateway IP, and NAT it out. In `/etc/network/interfaces` on the node:
+
+```
+auto vmbr40
+iface vmbr40 inet static
+    address 192.168.40.1/24
+    bridge-ports none
+    bridge-stp off
+    bridge-fd 0
+    post-up   iptables -t nat -A POSTROUTING -s 192.168.40.0/24 -o vmbr0 -j MASQUERADE
+    post-down iptables -t nat -D POSTROUTING -s 192.168.40.0/24 -o vmbr0 -j MASQUERADE
+```
+
+(Replace `vmbr0` with your WAN-facing bridge.) Then enable forwarding
+(`net.ipv4.ip_forward=1`) and `ifreload -a`. Alternatively, run Ansible from a
+small Debian LXC/VM with a NIC on `vmbr40`.
+
+### Build steps
+
+1. **Control node:** `apt install -y ansible genisoimage curl`, then
+   `cd danderspritz_lab && ansible-galaxy collection install -r requirements.yml`.
+2. **Stage ISOs** into the node's ISO storage (verified as above), plus the
+   latest stable `virtio-win.iso`.
+3. **API token:** Datacenter → Permissions → API Tokens → add `root@pam` token
+   `ansible`; for a lab, untick *Privilege Separation*. Put the secret in
+   `group_vars/vault.yml` (copy `vault.yml.example`) and
+   `ansible-vault encrypt group_vars/vault.yml`.
+4. **Point the playbook at your node** in `group_vars/all.yml`
+   (`proxmox_api_host`, `proxmox_node`, storage names, `proxmox_lab_bridge`,
+   `proxmox_virtio_iso`). The ISO filenames already match the table above.
+5. **Build one VM first** to prove virtio + WinRM (comment out `dc`/`target` in
+   `lab_vms`): `ansible-playbook build.yml --ask-vault-pass`, watch the console.
+   If Setup can't find the disk, fix `virtio_winpe_drive` in
+   `roles/proxmox_vm/defaults/main.yml`. Then
+   `ansible-playbook configure.yml --limit danderspritz --ask-vault-pass`.
+6. **Build everything:** restore `lab_vms` and run
+   `ansible-playbook site.yml --ask-vault-pass`. Order is handled: all VMs
+   built, then common prep → DC promoted → target joins domain → DSZ box.
+7. **Acceptance test:** the FuzzBunch → EternalBlue → DoublePulsar → PeddleCheap
+   walkthrough below — that proves the lab, not just a green playbook run.
+
+> **Known rough edges** (both documented in `danderspritz_lab/README.md`): the
+> virtio drive-letter during install, and the post-`dcpromo` DC credentials
+> (set `ansible_user: "windomain\\vagrant"` in `inventory/host_vars/dc.yml` if
+> WinRM to the DC fails right after promotion).
+
+---
+
 ## Lab Information
 
 ### Lab Diagram
