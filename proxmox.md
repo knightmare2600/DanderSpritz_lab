@@ -27,8 +27,22 @@ exploit test.
 
 ## 1. Network: isolated bridge with a NAT gateway
 
-On the node, add to `/etc/network/interfaces` (swap `vmbr0` for your WAN-facing
-bridge):
+Two ways to get the bridge. **Pick one** — don't do both (the playbook refuses to
+reuse an existing bridge, so a hand-made `vmbr40` would make the auto-create path
+stop and ask for a different name).
+
+**Either (A) let `build.yml` create it** — leave `lab_bridge_autocreate: true`
+(default) and do *not* make the bridge by hand. On build, `roles/proxmox_net`
+checks the API: if `proxmox_lab_bridge` (e.g. `vmbr40`) is free it creates an
+isolated bridge (no uplink, gateway IP, comment `danderspritz-lab`); if the name
+is already taken it stops and asks you for a different `vmbrN`, re-checking until
+you give a free one. The API **cannot** add the outbound NAT, so after it runs,
+add the masquerade rule on the node (the `post-up`/`post-down` lines below) and
+`ifreload -a`.
+
+**Or (B) make it by hand** (and set `lab_bridge_autocreate: false` so the
+playbook leaves your bridge alone). Add to `/etc/network/interfaces`, swapping
+`vmbr0` for your WAN-facing bridge:
 
 ```
 auto vmbr40
@@ -45,6 +59,9 @@ iface vmbr40 inet static
 echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf && sysctl -p
 ifreload -a
 ```
+
+Either way the guests need outbound during the build (SP1, Chocolatey, FLARE),
+so the NAT matters — it's the one piece the auto-create path can't do for you.
 
 ## 2. Stage the ISOs (verified) into PVE storage
 

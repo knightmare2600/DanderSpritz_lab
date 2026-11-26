@@ -1,0 +1,15 @@
+---
+# Check for the lab bridge via the Proxmox API and create it if its name is
+# free. If the name is already in use, the run stops and asks for a different
+# vmbrN name (an existing bridge is never reused or modified), re-checking until
+# a free one is given. Set false to skip and manage the bridge yourself.
+lab_bridge_autocreate: true
+
+# Friendly label stored in the bridge's comment (Proxmox bridge *interfaces*
+# must be named vmbrN, so the name itself cannot be "danderspritz-lab").
+lab_bridge_comment: "danderspritz-lab"
+
+# Address placed on the bridge (the lab gateway). NOTE: the API creates the
+# bridge with no uplink (isolated) and this IP, but it cannot add the outbound
+# NAT masquerade - that stays a manual post-up rule (see proxmox.md).
+lab_bridge_cidr: "{{ lab_gateway }}/{{ lab_netmask }}"

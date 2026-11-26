@@ -1,0 +1,48 @@
+---
+# Create the isolated lab bridge. Only reached once resolve_bridge_name.yml has
+# confirmed proxmox_lab_bridge is a free name.
+
+- name: "net | bridge name must be vmbrN (Proxmox requirement)"
+  ansible.builtin.assert:
+    that:
+      - proxmox_lab_bridge is match('^vmbr[0-9]+$')
+    fail_msg: >-
+      '{{ proxmox_lab_bridge }}' is not a valid Proxmox bridge name — it must be
+      vmbr followed by digits (e.g. vmbr40). Set proxmox_lab_bridge accordingly.
+    quiet: true
+
+- name: "net | create isolated bridge '{{ proxmox_lab_bridge }}' (no uplink, gateway IP)"
+  ansible.builtin.uri:
+    url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/network"
+    method: POST
+    headers:
+      Authorization: "PVEAPIToken={{ proxmox_api_user }}!{{ proxmox_api_token_id }}={{ proxmox_api_token_secret }}"
+    body_format: form-urlencoded
+    body:
+      iface: "{{ proxmox_lab_bridge }}"
+      type: bridge
+      autostart: 1
+      bridge_ports: ""          # no physical port = isolated L2
+      cidr: "{{ lab_bridge_cidr }}"
+      comments: "{{ lab_bridge_comment }}"
+    validate_certs: "{{ proxmox_validate_certs }}"
+    status_code: [200, 201]
+  no_log: true
+
+- name: "net | apply the pending network configuration (needs ifupdown2)"
+  ansible.builtin.uri:
+    url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/network"
+    method: PUT
+    headers:
+      Authorization: "PVEAPIToken={{ proxmox_api_user }}!{{ proxmox_api_token_id }}={{ proxmox_api_token_secret }}"
+    validate_certs: "{{ proxmox_validate_certs }}"
+  no_log: true
+
+- name: "net | isolated bridge created — outbound NAT is still manual"
+  ansible.builtin.debug:
+    msg: >-
+      Created isolated bridge '{{ proxmox_lab_bridge }}' ({{ lab_bridge_cidr }},
+      comment '{{ lab_bridge_comment }}'). It has NO uplink and NO outbound NAT:
+      the API cannot add the masquerade rule. Add the post-up iptables rule from
+      proxmox.md (or an SDN SNAT) so the guests can reach the internet during the
+      build, or they will fail on the online tool downloads.

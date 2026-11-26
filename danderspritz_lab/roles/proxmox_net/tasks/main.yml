@@ -1,0 +1,16 @@
+---
+# Ensure an isolated lab bridge exists, creating it only if its name is free.
+# Runs on the control node (uses the Proxmox API); expects the proxmox_* vars
+# incl. proxmox_api_token_secret from vault.
+
+- name: "net | resolve a free bridge name, then create it"
+  when: lab_bridge_autocreate | bool
+  block:
+    # Phase 1: settle on a bridge name that is NOT already in use (may prompt
+    # and recurse). Only sets proxmox_lab_bridge; does not create anything.
+    - name: "net | find an unused bridge name"
+      ansible.builtin.include_tasks: resolve_bridge_name.yml
+
+    # Phase 2: create that (now confirmed-free) bridge, once.
+    - name: "net | create the isolated bridge '{{ proxmox_lab_bridge }}'"
+      ansible.builtin.include_tasks: create_bridge.yml

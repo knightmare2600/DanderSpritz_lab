@@ -1,0 +1,38 @@
+---
+# Recursive: if proxmox_lab_bridge is already a bridge on the node, prompt for a
+# different vmbrN name and re-check. Returns once proxmox_lab_bridge is a name
+# that does NOT already exist. Creates nothing.
+
+- name: "net | list existing bridges on {{ proxmox_node }}"
+  ansible.builtin.uri:
+    url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/network?type=any_bridge"
+    method: GET
+    headers:
+      Authorization: "PVEAPIToken={{ proxmox_api_user }}!{{ proxmox_api_token_id }}={{ proxmox_api_token_secret }}"
+    validate_certs: "{{ proxmox_validate_certs }}"
+  register: net_bridges
+  no_log: true
+
+- name: "net | names of existing bridges"
+  ansible.builtin.set_fact:
+    _existing_bridges: "{{ net_bridges.json.data | map(attribute='iface') | list }}"
+
+- name: "net | '{{ proxmox_lab_bridge }}' already exists — ask for a different name and re-check"
+  when: proxmox_lab_bridge in _existing_bridges
+  block:
+    - name: "net | prompt for an unused bridge name"
+      ansible.builtin.pause:
+        prompt: |
+
+          Bridge '{{ proxmox_lab_bridge }}' already exists on {{ proxmox_node }} and will NOT be
+          reused or modified. Existing bridges: {{ _existing_bridges | join(', ') }}
+          Enter a DIFFERENT, unused Proxmox bridge name (must be vmbrN, e.g. vmbr41)
+      register: _bridge_prompt
+
+    - name: "net | adopt the new name"
+      ansible.builtin.set_fact:
+        proxmox_lab_bridge: "{{ _bridge_prompt.user_input | trim }}"
+
+    # Re-check the new name (which may also be taken, or malformed).
+    - name: "net | re-check the new name"
+      ansible.builtin.include_tasks: resolve_bridge_name.yml

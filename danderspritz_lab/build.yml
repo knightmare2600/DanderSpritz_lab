@@ -38,6 +38,10 @@
       ansible.builtin.debug:
         msg: "Building: {{ _selected_vms | map(attribute='name') | list }}"
 
+    - name: "Ensure the isolated lab bridge exists (create if its name is free)"
+      ansible.builtin.include_role:
+        name: proxmox_net
+
     - name: "Preflight: ISOs present, correctly named, and (on-node) SHA-256 correct"
       ansible.builtin.include_role:
         name: preflight
