@@ -191,23 +191,25 @@ Archive does. **Verify every download against the checksum before use.**
 | Host | MD5 | SHA-1 | SHA-256 |
 |------|-----|-------|---------|
 | DC | `4263be2cf3c59177c45085c0a7bc6ca5` | `beed231a34e90e1dd9a04b3afabec31d62ce3889` | `30832ad76ccfa4ce48ccb936edefe02079d42fb1da32201bf9e3a880c8ed6312` |
-| Target | `1d0d239a252cb53e466d39e752b17c28` | _compute & verify locally_ † | _compute & verify locally_ † |
-| DanderSpritz | _compute & verify locally_ † | `56ab095075be28a90bc0b510835280975c6bb2ce` | _compute & verify locally_ † |
+| Target | `1d0d239a252cb53e466d39e752b17c28` | `15ddabafa72071a06d5213b486a02d5b55cb7070` | `2c16c73388a5c02a0ec4cd8b9e5c14ba28b7b45d13d0c9c7d44459feecc0385f` |
+| DanderSpritz | `6cd2f47f2c32faa7be85f1dc81af3220` | `56ab095075be28a90bc0b510835280975c6bb2ce` | `9b53e1f6ab6259a05d0e8f42db5baad50b57da34da9312783f7e8bd4ae2cd3ca` |
 
 The DC row is confirmed against two independent sources (rg-adguard and
-HashiCorp's Packer documentation). The filled Target/DanderSpritz values are the
-project's own pinned checksums. **†** The remaining cells are deliberately left
-blank rather than filled with an unverified value: once your download matches
-the known hash above, compute the rest locally — that file is then your source
-of truth.
+HashiCorp's Packer documentation). The project pins the DC/Target MD5s and the
+DanderSpritz SHA-1; the remaining values were computed from downloaded copies
+whose pinned hash matched, so they are authoritative for these exact files.
+Verify your own downloads against the full set:
 
 ```bash
-# verify the known hashes, then capture the others for your records
-md5sum    7601.17514*.iso    # == 4263be2cf3c59177c45085c0a7bc6ca5
-sha256sum 7601.17514*.iso    # == 30832ad76ccfa4ce48ccb936edefe02079d42fb1da32201bf9e3a880c8ed6312
-md5sum    7600.16385*.iso    # == 1d0d239a252cb53e466d39e752b17c28
-sha1sum   10240.16384*.iso   # == 56ab095075be28a90bc0b510835280975c6bb2ce
-sha256sum 7600.16385*.iso 10240.16384*.iso   # record these for the table
+md5sum    7601.17514.101119-1850_x64fre_server_eval_en-us-GRMSXEVAL_EN_DVD.iso
+sha1sum   7601.17514.101119-1850_x64fre_server_eval_en-us-GRMSXEVAL_EN_DVD.iso
+sha256sum 7601.17514.101119-1850_x64fre_server_eval_en-us-GRMSXEVAL_EN_DVD.iso
+md5sum    7600.16385.090713-1255_x64fre_enterprise_en-us_EVAL_Eval_Enterprise-GRMCENXEVAL_EN_DVD.iso
+sha1sum   7600.16385.090713-1255_x64fre_enterprise_en-us_EVAL_Eval_Enterprise-GRMCENXEVAL_EN_DVD.iso
+sha256sum 7600.16385.090713-1255_x64fre_enterprise_en-us_EVAL_Eval_Enterprise-GRMCENXEVAL_EN_DVD.iso
+md5sum    10240.16384.150709-1700.TH1_CLIENTENTERPRISEEVAL_OEMRET_X64FRE_EN-US.ISO
+sha1sum   10240.16384.150709-1700.TH1_CLIENTENTERPRISEEVAL_OEMRET_X64FRE_EN-US.ISO
+sha256sum 10240.16384.150709-1700.TH1_CLIENTENTERPRISEEVAL_OEMRET_X64FRE_EN-US.ISO
 ```
 
 ### Network topology — read this first

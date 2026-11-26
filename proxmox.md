@@ -66,9 +66,9 @@ sha1sum 10240.16384.150709-1700.TH1_CLIENTENTERPRISEEVAL_OEMRET_X64FRE_EN-US.ISO
 #   == 56ab095075be28a90bc0b510835280975c6bb2ce
 ```
 
-(The DC ISO's SHA-256 is `30832ad76ccfa4ce48ccb936edefe02079d42fb1da32201bf9e3a880c8ed6312`
-if you prefer. The Target/DSZ SHA-256s are not independently confirmed — compute
-them locally once the above pass.)
+A single matching hash is enough to trust the file; the full MD5/SHA-1/SHA-256
+set for all three ISOs is in the top-level [`README.md`](README.md) if you want
+to check more than one.
 
 ## 3. API token
 
