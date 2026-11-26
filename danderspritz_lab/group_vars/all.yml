@@ -98,7 +98,27 @@ proxmox_disk_storage: "local-lvm"  # content type: images
 #              OWN firewall VM (pfSense/IPFire/OPNsense/...) on that VLAN as the
 #              lab's gateway/NAT/DHCP. The playbook does NOT touch host networking
 #              and creates no bridge. This is the "bring your own firewall" model.
+#   routed   - the playbook builds a tiny Debian LXC that IS 192.168.40.1: NAT
+#              out via lab_gateway_wan_bridge, DHCP+DNS on the isolated bridge.
+#              Isolated AND internet-connected with NO host NAT and nothing for
+#              you to hand-build. Requires root SSH from the control node to the
+#              PVE node (gateway.yml runs there via pct/pveam/pvesh).
 lab_network_mode: managed
+
+# --- routed mode: auto-built NAT gateway LXC --------------------------------
+# SSH to the PVE node (used only by gateway.yml in routed mode).
+proxmox_node_ssh_host: "{{ proxmox_api_host }}"
+proxmox_node_ssh_user: "root"
+lab_gateway_vmid: 900
+lab_gateway_hostname: "dsz-gw"
+lab_gateway_wan_bridge: "vmbr0"          # bridge with internet, becomes the LXC's WAN (DHCP)
+lab_gateway_rootfs_storage: "local-lvm"  # storage for the LXC rootfs (override to e.g. local-zfs)
+lab_gateway_template_storage: "local"    # storage holding the LXC template (vztmpl content)
+lab_gateway_cores: 1
+lab_gateway_memory: 512
+lab_gateway_rootfs_gb: 2
+lab_dhcp_range_start: "192.168.40.100"   # DHCP pool, kept clear of the static .2/.3/.4
+lab_dhcp_range_end: "192.168.40.150"
 
 # VLAN id for 'tagged' mode (e.g. 40). Ignored in the other modes.
 lab_vlan: ""

@@ -1,0 +1,28 @@
+---
+# routed mode only: build the lab NAT gateway LXC ON the PVE node over SSH.
+# A no-op in every other lab_network_mode. Run it before build.yml (site.yml
+# does this for you), as the gateway creates the isolated LAN bridge the lab
+# VMs attach to.
+#
+#   ansible-playbook gateway.yml -e lab_network_mode=routed \
+#     -e proxmox_api_host=<node-ip> -e proxmox_node=<node-name>
+
+- name: Register the PVE node for SSH (routed mode)
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: "Add the PVE node as an SSH target"
+      ansible.builtin.add_host:
+        name: lab_pve_node
+        ansible_host: "{{ proxmox_node_ssh_host | default(proxmox_api_host) }}"
+        ansible_user: "{{ proxmox_node_ssh_user | default('root') }}"
+        ansible_connection: ssh
+        groups: lab_pve_node
+      when: lab_network_mode == 'routed'
+      changed_when: false
+
+- name: Build the lab NAT gateway (routed mode)
+  hosts: lab_pve_node
+  gather_facts: true
+  roles:
+    - proxmox_gateway

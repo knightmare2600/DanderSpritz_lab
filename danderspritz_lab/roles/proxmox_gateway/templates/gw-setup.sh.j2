@@ -1,0 +1,46 @@
+#!/bin/bash
+# Configure the lab NAT gateway inside the LXC: IP forwarding, dnsmasq (DHCP +
+# DNS on the LAN leg), and nftables masquerade out of the WAN leg. Idempotent.
+# eth0 = WAN (DHCP, from {{ lab_gateway_wan_bridge }}); eth1 = LAN ({{ lab_gateway }}).
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+# Wait for WAN/DNS, then install the tools.
+for i in $(seq 1 30); do
+  if apt-get update; then break; fi
+  sleep 5
+done
+apt-get install -y dnsmasq nftables
+
+# IP forwarding.
+echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-lab-router.conf
+sysctl -w net.ipv4.ip_forward=1
+
+# DHCP + DNS on the LAN side. The static lab hosts (.2/.3/.4) sit outside this
+# pool; anything else on the lab net gets an address and uses the gateway for
+# DNS/route-out.
+cat > /etc/dnsmasq.d/lab.conf <<EOF
+interface=eth1
+bind-interfaces
+dhcp-range={{ lab_dhcp_range_start }},{{ lab_dhcp_range_end }},12h
+dhcp-option=3,{{ lab_gateway }}
+dhcp-option=6,{{ lab_gateway }}
+EOF
+systemctl enable dnsmasq
+systemctl restart dnsmasq
+
+# NAT: masquerade LAN traffic out of the WAN interface.
+cat > /etc/nftables.conf <<'EOF'
+#!/usr/sbin/nft -f
+flush ruleset
+table ip nat {
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        oifname "eth0" masquerade
+    }
+}
+EOF
+systemctl enable nftables
+systemctl restart nftables
+
+echo "lab gateway configured: DHCP {{ lab_dhcp_range_start }}-{{ lab_dhcp_range_end }}, NAT eth1 -> eth0"

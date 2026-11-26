@@ -5,5 +5,9 @@
 #
 # Re-run safely: build.yml is idempotent (skips VMs that already exist) and
 # configure.yml re-applies guest state.
+#
+# gateway.yml builds the NAT gateway LXC first in `routed` mode (and is a no-op
+# otherwise), because it creates the isolated LAN bridge the VMs attach to.
+- import_playbook: gateway.yml
 - import_playbook: build.yml
 - import_playbook: configure.yml

@@ -1,0 +1,113 @@
+---
+# Build/configure the lab NAT gateway LXC. Runs ON the PVE node over SSH (see
+# gateway.yml), using pvesh/pveam/pct. Creates the isolated LAN bridge, ensures
+# a Debian template, creates the container (WAN=DHCP on vmbr0, LAN=.1 on the lab
+# bridge), and configures NAT + DHCP inside it. Idempotent-ish: skips what's
+# already present. All NAT lives in the container — the host does no NAT.
+
+# --- isolated LAN bridge ----------------------------------------------------
+- name: "gw | is the lab bridge '{{ proxmox_lab_bridge }}' present?"
+  ansible.builtin.command: "ip link show {{ proxmox_lab_bridge }}"
+  register: gw_bridge
+  changed_when: false
+  failed_when: false
+
+- name: "gw | create the isolated LAN bridge (no uplink, no host IP)"
+  when: gw_bridge.rc != 0
+  block:
+    - name: "gw | define the bridge"
+      ansible.builtin.command: >-
+        pvesh create /nodes/{{ proxmox_node }}/network
+        --iface {{ proxmox_lab_bridge }} --type bridge --autostart 1 --bridge_ports ''
+        --comments 'danderspritz-lab (routed)'
+      changed_when: true
+    - name: "gw | apply the network config"
+      ansible.builtin.command: "pvesh set /nodes/{{ proxmox_node }}/network"
+      changed_when: true
+
+# --- Debian LXC template ----------------------------------------------------
+- name: "gw | refresh the appliance template catalogue"
+  ansible.builtin.command: pveam update
+  changed_when: false
+  failed_when: false
+
+- name: "gw | pick the newest debian-12-standard template name"
+  ansible.builtin.shell: "set -o pipefail; pveam available --section system | awk '{print $2}' | grep '^debian-12-standard' | sort -V | tail -1"
+  args:
+    executable: /bin/bash
+  register: gw_tmpl_name
+  changed_when: false
+
+- name: "gw | a template name must have been found"
+  ansible.builtin.assert:
+    that: [gw_tmpl_name.stdout | length > 0]
+    fail_msg: "No debian-12-standard template in `pveam available`. Run `pveam update` on the node and check connectivity."
+    quiet: true
+
+- name: "gw | is the template already downloaded?"
+  ansible.builtin.command: "pveam list {{ lab_gateway_template_storage }}"
+  register: gw_tmpl_list
+  changed_when: false
+
+- name: "gw | download the template if missing"
+  ansible.builtin.command: "pveam download {{ lab_gateway_template_storage }} {{ gw_tmpl_name.stdout }}"
+  when: gw_tmpl_name.stdout not in gw_tmpl_list.stdout
+  changed_when: true
+
+# --- the gateway container --------------------------------------------------
+- name: "gw | does the gateway container {{ lab_gateway_vmid }} already exist?"
+  ansible.builtin.command: "pct status {{ lab_gateway_vmid }}"
+  register: gw_ct
+  changed_when: false
+  failed_when: false
+
+- name: "gw | create the gateway LXC"
+  when: gw_ct.rc != 0
+  ansible.builtin.command: >-
+    pct create {{ lab_gateway_vmid }}
+    {{ lab_gateway_template_storage }}:vztmpl/{{ gw_tmpl_name.stdout }}
+    --hostname {{ lab_gateway_hostname }}
+    --cores {{ lab_gateway_cores }} --memory {{ lab_gateway_memory }}
+    --rootfs {{ lab_gateway_rootfs_storage }}:{{ lab_gateway_rootfs_gb }}
+    --net0 name=eth0,bridge={{ lab_gateway_wan_bridge }},ip=dhcp
+    --net1 name=eth1,bridge={{ proxmox_lab_bridge }},ip={{ lab_gateway }}/{{ lab_netmask }}
+    --ostype debian --unprivileged 0 --features nesting=1 --onboot 1 --start 1
+  changed_when: true
+
+- name: "gw | ensure the container is running"
+  ansible.builtin.command: "pct start {{ lab_gateway_vmid }}"
+  register: gw_start
+  changed_when: "'already running' not in (gw_start.stderr | default(''))"
+  failed_when: gw_start.rc != 0 and 'already running' not in (gw_start.stderr | default(''))
+
+- name: "gw | wait for the container to accept exec"
+  ansible.builtin.command: "pct exec {{ lab_gateway_vmid }} -- true"
+  register: gw_ready
+  until: gw_ready.rc == 0
+  retries: 24
+  delay: 5
+  changed_when: false
+
+# --- configure NAT + DHCP inside the container ------------------------------
+- name: "gw | render the in-container setup script onto the node"
+  ansible.builtin.template:
+    src: gw-setup.sh.j2
+    dest: "/tmp/dsz-gw-setup.sh"
+    mode: "0755"
+
+- name: "gw | push the setup script into the container"
+  ansible.builtin.command: "pct push {{ lab_gateway_vmid }} /tmp/dsz-gw-setup.sh /root/dsz-gw-setup.sh"
+  changed_when: true
+
+- name: "gw | run the setup script (installs dnsmasq + nftables, NAT, DHCP)"
+  ansible.builtin.command: "pct exec {{ lab_gateway_vmid }} -- bash /root/dsz-gw-setup.sh"
+  register: gw_setup
+  changed_when: true
+
+- name: "gw | gateway ready"
+  ansible.builtin.debug:
+    msg: >-
+      Lab gateway LXC {{ lab_gateway_vmid }} ({{ lab_gateway_hostname }}) is up:
+      {{ lab_gateway }}/{{ lab_netmask }} on {{ proxmox_lab_bridge }}, NAT out via
+      {{ lab_gateway_wan_bridge }}, DHCP {{ lab_dhcp_range_start }}-{{ lab_dhcp_range_end }}.
+      The lab's static hosts (.2/.3/.4) route out through it; no host NAT was added.

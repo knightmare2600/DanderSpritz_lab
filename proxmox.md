@@ -58,6 +58,27 @@ Set `lab_network_mode: existing` and `proxmox_lab_bridge` to your bridge. The
 playbook touches no host networking; your existing setup routes/NATs the lab
 subnet. `lab_gateway` must be whatever gateway lives on that network.
 
+### `routed` — the playbook builds a NAT gateway for you
+
+Set `lab_network_mode: routed`. The playbook stands up a tiny Debian **LXC** that
+*is* `192.168.40.1`: WAN leg on `lab_gateway_wan_bridge` (default `vmbr0`, via
+DHCP), LAN leg on the isolated lab bridge, running `dnsmasq` (DHCP
+`lab_dhcp_range_start`–`end`, default `.100`–`.150`, + DNS) and `nftables`
+masquerade. Isolated **and** internet-connected, with **no host NAT** and nothing
+for you to hand-build. The lab's static hosts (`.2/.3/.4`) sit outside the DHCP
+pool and route out through it.
+
+This is the only mode that needs **root SSH from the control node to the PVE
+node** — `gateway.yml` runs there (`pct`/`pveam`/`pvesh`) to create the bridge,
+auto-download the LXC template, and build + configure the container. `site.yml`
+runs `gateway.yml` before `build.yml` automatically; standalone, run it first:
+
+```bash
+ansible-playbook gateway.yml -e lab_network_mode=routed \
+  -e proxmox_api_host=<node-ip> -e proxmox_node=<node-name>
+# override lab_gateway_rootfs_storage if local-lvm isn't your storage (e.g. local-zfs)
+```
+
 ### `tagged` — bring your own firewall VM on a VLAN
 
 Set `lab_network_mode: tagged`, `proxmox_lab_bridge` to your existing bridge
