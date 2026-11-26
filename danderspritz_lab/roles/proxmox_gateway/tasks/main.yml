@@ -88,7 +88,37 @@
   delay: 5
   changed_when: false
 
+# --- discover the DHCP-assigned WAN IP + mgmt subnet (no static WAN) --------
+- name: "gw | wait for the WAN (eth0) DHCP lease"
+  ansible.builtin.command: "pct exec {{ lab_gateway_vmid }} -- ip -4 -o addr show dev eth0"
+  register: gw_wan_addr
+  until: gw_wan_addr.stdout is search('inet ')
+  retries: 12
+  delay: 5
+  changed_when: false
+
+- name: "gw | discover the eth0 connected (mgmt) subnet"
+  ansible.builtin.command: "pct exec {{ lab_gateway_vmid }} -- ip -4 route show dev eth0 scope link"
+  register: gw_wan_route
+  changed_when: false
+
+- name: "gw | record the gateway WAN IP and mgmt subnet"
+  ansible.builtin.set_fact:
+    gw_wan_ip: "{{ gw_wan_addr.stdout | regex_search('inet ([0-9.]+)/', '\\1') | first }}"
+    gw_mgmt_subnet: "{{ gw_wan_route.stdout | regex_search('([0-9.]+/[0-9]+)', '\\1') | first }}"
+
+- name: "gw | WAN IP and mgmt subnet must have been discovered"
+  ansible.builtin.assert:
+    that:
+      - gw_wan_ip | default('') | length > 0
+      - gw_mgmt_subnet | default('') | length > 0
+    fail_msg: "Could not read the gateway's WAN IP/subnet from eth0 (no DHCP lease on {{ lab_gateway_wan_bridge }}?)."
+    quiet: true
+
 # --- configure NAT + DHCP inside the container ------------------------------
+# gw_mgmt_subnet is excluded from masquerade so the lab <-> mgmt-net path is
+# plain-routed (both directions), which is what lets the control node reach the
+# guests; only genuinely internet-bound traffic is NAT'd.
 - name: "gw | render the in-container setup script onto the node"
   ansible.builtin.template:
     src: gw-setup.sh.j2
@@ -104,10 +134,25 @@
   register: gw_setup
   changed_when: true
 
+# --- make the lab reachable from the control node (route via the gateway) ---
+# One-shot, dynamic: uses the discovered WAN IP, re-derived each run. Needs sudo
+# on the control node; if that's not available the exact command is printed.
+- name: "gw | add a route to the lab subnet on the control node"
+  ansible.builtin.command: "ip route replace {{ lab_subnet }}.0/{{ lab_netmask }} via {{ gw_wan_ip }}"
+  delegate_to: localhost
+  become: true
+  register: gw_route
+  failed_when: false
+  changed_when: gw_route.rc == 0
+
 - name: "gw | gateway ready"
   ansible.builtin.debug:
     msg: >-
       Lab gateway LXC {{ lab_gateway_vmid }} ({{ lab_gateway_hostname }}) is up:
-      {{ lab_gateway }}/{{ lab_netmask }} on {{ proxmox_lab_bridge }}, NAT out via
-      {{ lab_gateway_wan_bridge }}, DHCP {{ lab_dhcp_range_start }}-{{ lab_dhcp_range_end }}.
-      The lab's static hosts (.2/.3/.4) route out through it; no host NAT was added.
+      {{ lab_gateway }}/{{ lab_netmask }} on {{ proxmox_lab_bridge }}, WAN {{ gw_wan_ip }}
+      on {{ lab_gateway_wan_bridge }}, DHCP {{ lab_dhcp_range_start }}-{{ lab_dhcp_range_end }}.
+      Internet-bound traffic is NAT'd; the {{ gw_mgmt_subnet }} mgmt path is routed.
+      {{ 'Control-node route to ' ~ lab_subnet ~ '.0/' ~ lab_netmask ~ ' via ' ~ gw_wan_ip ~ ' is in place.'
+         if gw_route.rc == 0
+         else ('ADD THIS ROUTE on the control node (needs sudo): sudo ip route replace '
+               ~ lab_subnet ~ '.0/' ~ lab_netmask ~ ' via ' ~ gw_wan_ip) }}
