@@ -53,9 +53,17 @@ node's ISO storage (`/var/lib/vz/template/iso/` for the `local` storage, or via
 the GUI). **Verify them first** against the known checksums:
 
 ```bash
-md5sum  7601.17514*.iso    # == 4263be2cf3c59177c45085c0a7bc6ca5            (DC, 2008 R2 SP1)
-md5sum  7600.16385*.iso    # == 1d0d239a252cb53e466d39e752b17c28            (Target, Win7 RTM)
-sha1sum 10240.16384*.iso   # == 56ab095075be28a90bc0b510835280975c6bb2ce    (DSZ, Win10 1507)
+# DC — Windows Server 2008 R2 SP1
+md5sum  7601.17514.101119-1850_x64fre_server_eval_en-us-GRMSXEVAL_EN_DVD.iso
+#   == 4263be2cf3c59177c45085c0a7bc6ca5
+
+# Target — Windows 7 Enterprise RTM
+md5sum  7600.16385.090713-1255_x64fre_enterprise_en-us_EVAL_Eval_Enterprise-GRMCENXEVAL_EN_DVD.iso
+#   == 1d0d239a252cb53e466d39e752b17c28
+
+# DanderSpritz — Windows 10 1507 Enterprise Eval
+sha1sum 10240.16384.150709-1700.TH1_CLIENTENTERPRISEEVAL_OEMRET_X64FRE_EN-US.ISO
+#   == 56ab095075be28a90bc0b510835280975c6bb2ce
 ```
 
 (The DC ISO's SHA-256 is `30832ad76ccfa4ce48ccb936edefe02079d42fb1da32201bf9e3a880c8ed6312`
@@ -142,7 +150,9 @@ acceptance test — a green Ansible run alone does not prove the exploit path.
 - **Tool-download URL rot** — several of the old `scripts/*.ps1` fetch tools
   (DanderSpritz, JRE 6u21, WinPython, FLARE packages) from the internet. Those
   URLs were already fragile in the original project and some may have rotted;
-  this is why the lab bridge needs outbound internet during the build.
+  this is why the lab bridge needs outbound internet during the build. The
+  direct-download files worth vendoring into the repo are listed in
+  [`danderspritz_lab/offline-assets.md`](danderspritz_lab/offline-assets.md).
 
 ## Day-to-day
 
