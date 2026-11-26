@@ -1,0 +1,5 @@
+# Secrets - never commit the real vault
+group_vars/vault.yml
+# Ansible retry/collection artefacts
+*.retry
+collections/

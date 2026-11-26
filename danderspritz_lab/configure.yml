@@ -1,0 +1,38 @@
+---
+# Phase 2 — configure the Windows guests over WinRM. This replaces the Vagrant
+# provisioning AND the config portion of the old Packer build.
+#
+# Order matters: common prep on all hosts, then the DC must be fully promoted
+# before the Target can join the domain.
+
+- name: Common Windows preparation (all guests)
+  hosts: windows
+  gather_facts: false
+  vars_files:
+    - group_vars/vault.yml
+  roles:
+    - common_windows
+
+- name: Build the Windows Server 2008 R2 domain controller
+  hosts: dc
+  gather_facts: false
+  vars_files:
+    - group_vars/vault.yml
+  roles:
+    - domain_controller
+
+- name: Build the Windows 7 target (joins the domain)
+  hosts: target
+  gather_facts: false
+  vars_files:
+    - group_vars/vault.yml
+  roles:
+    - target
+
+- name: Build the Windows 10 DanderSpritz workstation
+  hosts: danderspritz
+  gather_facts: false
+  vars_files:
+    - group_vars/vault.yml
+  roles:
+    - danderspritz

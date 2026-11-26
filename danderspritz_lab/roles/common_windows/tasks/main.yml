@@ -1,0 +1,54 @@
+---
+# Preparation common to all three guests. Replaces the shared Packer steps:
+# vm-guest-tools.bat -> qemu-guest-agent, enable-rdp.bat, Install-Chocolatey.ps1.
+# (vagrant-ssh.bat is dropped - Ansible uses WinRM.)
+
+- name: "Stage the repo scripts/ tree on the guest"
+  ansible.windows.win_copy:
+    src: "{{ windows_scripts_dir }}/"
+    dest: "{{ guest_stage_dir }}\\scripts\\"
+
+# --- Proxmox guest agent (was VirtualBox guest additions) -------------------
+# The qemu-ga MSI ships on the virtio-win ISO. If that ISO is still attached it
+# is the simplest source; otherwise install it out of band and set
+# qemu_ga_installed=true to skip.
+- name: "Look for the qemu guest-agent MSI on any attached CD"
+  ansible.windows.win_shell: |
+    $msi = Get-PSDrive -PSProvider FileSystem |
+      ForEach-Object { Join-Path $_.Root 'guest-agent\qemu-ga-x86_64.msi' } |
+      Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($msi) { $msi } else { '' }
+  register: qemu_ga_msi
+  changed_when: false
+
+- name: "Install qemu guest agent"
+  ansible.windows.win_package:
+    path: "{{ qemu_ga_msi.stdout | trim }}"
+    state: present
+  when: (qemu_ga_msi.stdout | trim) | length > 0
+
+- name: "Ensure the QEMU-GA service is running"
+  ansible.windows.win_service:
+    name: QEMU-GA
+    state: started
+    start_mode: auto
+  failed_when: false
+
+# --- RDP + Chocolatey (reuse the existing scripts) --------------------------
+- name: "Enable RDP"
+  ansible.windows.win_shell: "{{ guest_stage_dir }}\\scripts\\enable-rdp.bat"
+  args:
+    executable: cmd
+  changed_when: true
+
+- name: "Install Chocolatey"
+  ansible.builtin.include_tasks: run_ps_scripts.yml
+  vars:
+    ps_scripts:
+      - "Install-Chocolatey.ps1"
+
+# --- Re-arm the trial licence (buys another 90 days) ------------------------
+- name: "slmgr /rearm (best effort)"
+  ansible.windows.win_shell: "cscript //nologo C:\\Windows\\System32\\slmgr.vbs /rearm"
+  failed_when: false
+  changed_when: true

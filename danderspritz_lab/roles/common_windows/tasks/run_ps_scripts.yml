@@ -1,0 +1,15 @@
+---
+# Reusable runner: execute an ordered list of PowerShell scripts that have been
+# staged under {{ guest_stage_dir }}\scripts. Caller sets `ps_scripts` (paths
+# relative to the repo scripts/ dir, using backslashes, e.g. 'Target\Set-Hostname.ps1').
+#
+# Use from any role with:
+#   - include_role: { name: common_windows, tasks_from: run_ps_scripts }
+#     vars: { ps_scripts: [ ... ] }
+- name: "Run staged PowerShell scripts"
+  ansible.windows.win_shell: >-
+    powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive
+    -File "{{ guest_stage_dir }}\scripts\{{ item }}"
+  loop: "{{ ps_scripts }}"
+  register: ps_run
+  changed_when: true

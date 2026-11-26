@@ -1,0 +1,127 @@
+---
+# Windows 7 target workstation. Mirrors the Packer Target build (prereq KBs ->
+# SP1 -> more KBs -> FLARE RE tooling) then the Vagrant provision (domain join,
+# local admin, tools-folder link).
+#
+# Deliberately left under-patched beyond what's listed here: EternalBlue needs
+# an unpatched SMBv1. Do not add Windows Update.
+
+# --- Batch prep: tools folder + firewall off --------------------------------
+- name: "Target | create tools folder"
+  ansible.windows.win_shell: "{{ guest_stage_dir }}\\scripts\\Target\\create-tools-folder.bat"
+  args:
+    executable: cmd
+  changed_when: true
+
+- name: "Target | disable firewall"
+  ansible.windows.win_shell: "{{ guest_stage_dir }}\\scripts\\Target\\disable_firewall.bat"
+  args:
+    executable: cmd
+  changed_when: true
+
+# --- Pre-SP1 prerequisite hotfixes ------------------------------------------
+- name: "Target | prerequisite KBs"
+  ansible.builtin.include_role:
+    name: common_windows
+    tasks_from: run_ps_scripts
+  vars:
+    ps_scripts:
+      - "Target\\Install-KB2454826.ps1"
+      - "Target\\Install-KB2534366.ps1"
+      - "Target\\Install-KB2533552.ps1"
+
+- name: "Target | reboot after prerequisite KBs"
+  ansible.windows.win_reboot:
+    reboot_timeout: 900
+
+# --- Service Pack 1 (long) --------------------------------------------------
+- name: "Target | install SP1"
+  ansible.builtin.include_role:
+    name: common_windows
+    tasks_from: run_ps_scripts
+  vars:
+    ps_scripts:
+      - "Target\\Install-SP1.ps1"
+
+- name: "Target | reboot after SP1 (can be very slow)"
+  ansible.windows.win_reboot:
+    reboot_timeout: 2400
+    post_reboot_delay: 120
+
+# --- Post-SP1 KBs -----------------------------------------------------------
+- name: "Target | post-SP1 KBs"
+  ansible.builtin.include_role:
+    name: common_windows
+    tasks_from: run_ps_scripts
+  vars:
+    ps_scripts:
+      - "Target\\Install-KB3035131.ps1"
+      - "Target\\Install-KB3033929.ps1"
+      - "Target\\Install-KB2999226.ps1"
+
+- name: "Target | reboot after post-SP1 KBs"
+  ansible.windows.win_reboot:
+    reboot_timeout: 1200
+
+# --- FLARE reversing toolset + sysmon ---------------------------------------
+- name: "Target | vcredist, FLARE repo and RE tooling"
+  ansible.builtin.include_role:
+    name: common_windows
+    tasks_from: run_ps_scripts
+  vars:
+    ps_scripts:
+      - "Target\\Install-vcredist2015.ps1"
+      - "Target\\Set-ChocolateyFLARERepo.ps1"
+      - "Target\\show-hidden-files.ps1"
+      - "Target\\Install-Sysinternals.ps1"
+      - "Target\\Install-FLAREAPIMonitor.ps1"
+      - "Target\\Install-FLAREEXEInfoPE.ps1"
+      - "Target\\Install-FLAREHXD.ps1"
+      - "Target\\Install-FLAREPEID.ps1"
+      - "Target\\Install-FLAREPEView.ps1"
+      - "Target\\Install-FLAREWindbg.ps1"
+      - "Target\\Install-FLAREWireshark.ps1"
+      - "Target\\Install-FLAREBinaryNinja.ps1"
+      - "Target\\Install-FLAREHashCalc.ps1"
+      - "Target\\Install-FLAREIDAFree.ps1"
+      - "Target\\Install-FLAREOllydbg2.ps1"
+      - "Target\\Install-Sysmon.ps1"
+      - "Target\\Set-Hostname.ps1"
+      - "autologon.ps1"
+
+- name: "Target | reboot before domain join"
+  ansible.windows.win_reboot:
+    reboot_timeout: 900
+
+# --- Join the domain (was the Vagrant target provisioner) -------------------
+- name: "Target | join windomain.local"
+  ansible.builtin.include_role:
+    name: common_windows
+    tasks_from: run_ps_scripts
+  vars:
+    ps_scripts:
+      - "Target\\Join-domain.ps1"
+
+- name: "Target | reboot after domain join"
+  ansible.windows.win_reboot:
+    reboot_timeout: 900
+
+- name: "Target | add domain local admin"
+  ansible.builtin.include_role:
+    name: common_windows
+    tasks_from: run_ps_scripts
+  vars:
+    ps_scripts:
+      - "Target\\Add-local-admin.ps1"
+
+- name: "Target | reboot after local-admin change"
+  ansible.windows.win_reboot:
+    reboot_timeout: 900
+
+- name: "Target | create the tools-folder link"
+  ansible.builtin.include_role:
+    name: common_windows
+    tasks_from: run_ps_scripts
+  vars:
+    ps_scripts:
+      - "Target\\Create-tools-folder-link.ps1"

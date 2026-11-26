@@ -1,0 +1,110 @@
+---
+# Create one Proxmox VM from a pre-staged Windows ISO + a generated answer-file
+# ISO, with virtio drivers injected so Setup can see the disk.
+#
+# Invoked per-VM from build.yml with loop_var `vm`. Runs on the control node;
+# all Proxmox calls go over the API.
+
+- name: "{{ vm.name }} | check whether the VM already exists"
+  community.general.proxmox_vm_info:
+    api_host: "{{ proxmox_api_host }}"
+    api_user: "{{ proxmox_api_user }}"
+    api_token_id: "{{ proxmox_api_token_id }}"
+    api_token_secret: "{{ proxmox_api_token_secret }}"
+    validate_certs: "{{ proxmox_validate_certs }}"
+    node: "{{ proxmox_node }}"
+    vmid: "{{ vm.vmid }}"
+  register: vm_existing
+  failed_when: false
+
+- name: "{{ vm.name }} | skip build (VM already present)"
+  ansible.builtin.debug:
+    msg: "vmid {{ vm.vmid }} already exists - leaving it alone. Destroy it first to rebuild."
+  when: (vm_existing.proxmox_vms | default([]) | length) > 0
+
+- name: "{{ vm.name }} | build and register the VM"
+  when: (vm_existing.proxmox_vms | default([]) | length) == 0
+  block:
+    # --- Build the answer-file ISO on the control node --------------------
+    - name: "{{ vm.name }} | local work dir"
+      ansible.builtin.file:
+        path: "{{ proxmox_vm_build_dir }}/{{ vm.name }}/iso_root"
+        state: directory
+        mode: "0755"
+
+    - name: "{{ vm.name }} | render Autounattend.xml (virtio drivers injected)"
+      ansible.builtin.template:
+        src: "{{ vm.os_short }}-Autounattend.xml.j2"
+        dest: "{{ proxmox_vm_build_dir }}/{{ vm.name }}/iso_root/Autounattend.xml"
+        mode: "0644"
+
+    - name: "{{ vm.name }} | build the answer-file ISO (label must be unattended media)"
+      ansible.builtin.command:
+        cmd: >-
+          genisoimage -quiet -J -r -V UNATTENDED
+          -o {{ proxmox_vm_build_dir }}/{{ vm.name }}-unattend.iso
+          {{ proxmox_vm_build_dir }}/{{ vm.name }}/iso_root
+      changed_when: true
+
+    # --- Upload it into Proxmox ISO storage via the API ------------------
+    # curl (not uri): the uri module's file lookup reads as text and corrupts a
+    # binary ISO. -F '...=@file' sends it correctly; literal fields use
+    # --form-string. --insecure mirrors proxmox_validate_certs=false.
+    - name: "{{ vm.name }} | upload answer-file ISO to {{ proxmox_iso_storage }}"
+      ansible.builtin.command:
+        cmd: >-
+          curl --fail --silent --show-error
+          {{ '--insecure' if not proxmox_validate_certs else '' }}
+          -H "Authorization: PVEAPIToken={{ proxmox_api_user }}!{{ proxmox_api_token_id }}={{ proxmox_api_token_secret }}"
+          --form-string content=iso
+          -F "filename=@{{ proxmox_vm_build_dir }}/{{ vm.name }}-unattend.iso;type=application/octet-stream"
+          "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/storage/{{ proxmox_iso_storage }}/upload"
+      no_log: true          # keep the API token out of logs
+      changed_when: true
+
+    # --- Create the VM ----------------------------------------------------
+    - name: "{{ vm.name }} | create VM (virtio-scsi disk, virtio net, 3 CDs)"
+      community.general.proxmox_kvm:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_token_id: "{{ proxmox_api_token_id }}"
+        api_token_secret: "{{ proxmox_api_token_secret }}"
+        validate_certs: "{{ proxmox_validate_certs }}"
+        node: "{{ proxmox_node }}"
+        vmid: "{{ vm.vmid }}"
+        name: "dsz-{{ vm.name }}"
+        ostype: "{{ vm.ostype }}"
+        bios: seabios
+        cores: "{{ vm.cores }}"
+        memory: "{{ vm.memory }}"
+        balloon: 0
+        scsihw: virtio-scsi-single
+        scsi:
+          scsi0: "{{ proxmox_disk_storage }}:{{ vm.disk_gb }},cache=writeback"
+        ide:
+          # Windows install media (bootable fallback once disk is empty).
+          ide2: "{{ proxmox_iso_storage }}:iso/{{ vm.iso }},media=cdrom"
+          # Answer file - Setup auto-scans removable media for Autounattend.xml.
+          ide0: "{{ proxmox_iso_storage }}:iso/{{ vm.name }}-unattend.iso,media=cdrom"
+        sata:
+          # virtio-win drivers, lettered in WinPE (see virtio_winpe_drive).
+          sata0: "{{ proxmox_iso_storage }}:iso/{{ proxmox_virtio_iso }},media=cdrom"
+        net:
+          net0: "virtio,bridge={{ proxmox_lab_bridge }}"
+        # Disk first: empty disk falls through to CD for the install, then boots
+        # the installed bootloader on every reboot - no install loop, no CD eject.
+        boot: "order=scsi0;ide2"
+        agent: enabled=1
+        onboot: false
+        state: present
+
+    - name: "{{ vm.name }} | power on"
+      community.general.proxmox_kvm:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_token_id: "{{ proxmox_api_token_id }}"
+        api_token_secret: "{{ proxmox_api_token_secret }}"
+        validate_certs: "{{ proxmox_validate_certs }}"
+        node: "{{ proxmox_node }}"
+        vmid: "{{ vm.vmid }}"
+        state: started

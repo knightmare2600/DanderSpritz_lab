@@ -1,0 +1,156 @@
+# Bringing up the DanderSpritz lab on Proxmox VE
+
+A hands-on, start-to-finish runbook for standing the lab up on a Proxmox VE node
+using the Ansible playbook in [`danderspritz_lab/`](danderspritz_lab/). It
+assumes you are sitting at a booted PVE node with the three Windows ISOs to
+hand. For the background on *how* the port works and the full checksum table,
+see the "Building on Proxmox VE with Ansible" section of the top-level
+[`README.md`](README.md) and [`danderspritz_lab/README.md`](danderspritz_lab/README.md).
+
+Ansible runs **from the PVE host itself** here — it is the simplest control node,
+as it can reach both the Proxmox API and the lab bridge.
+
+> This lab is **intentionally vulnerable** (unpatched SMBv1 target, default
+> `vagrant:vagrant` creds, firewall off). Keep `vmbr40` off anything you care
+> about. "Isolated" means no *inbound* from real networks — it still needs
+> *outbound* internet during the build for the tool downloads.
+
+---
+
+## TL;DR of the ordering
+
+bridge + NAT → verify + stage ISOs → API token → ansible + collections →
+edit `all.yml` + vault → `build.yml` one box (eyeball virtio) → `site.yml` →
+exploit test.
+
+---
+
+## 1. Network: isolated bridge with a NAT gateway
+
+On the node, add to `/etc/network/interfaces` (swap `vmbr0` for your WAN-facing
+bridge):
+
+```
+auto vmbr40
+iface vmbr40 inet static
+    address 192.168.40.1/24
+    bridge-ports none
+    bridge-stp off
+    bridge-fd 0
+    post-up   iptables -t nat -A POSTROUTING -s 192.168.40.0/24 -o vmbr0 -j MASQUERADE
+    post-down iptables -t nat -D POSTROUTING -s 192.168.40.0/24 -o vmbr0 -j MASQUERADE
+```
+
+```bash
+echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf && sysctl -p
+ifreload -a
+```
+
+## 2. Stage the ISOs (verified) into PVE storage
+
+Drop the three Windows ISOs plus the latest stable `virtio-win.iso` into the
+node's ISO storage (`/var/lib/vz/template/iso/` for the `local` storage, or via
+the GUI). **Verify them first** against the known checksums:
+
+```bash
+md5sum  7601.17514*.iso    # == 4263be2cf3c59177c45085c0a7bc6ca5            (DC, 2008 R2 SP1)
+md5sum  7600.16385*.iso    # == 1d0d239a252cb53e466d39e752b17c28            (Target, Win7 RTM)
+sha1sum 10240.16384*.iso   # == 56ab095075be28a90bc0b510835280975c6bb2ce    (DSZ, Win10 1507)
+```
+
+(The DC ISO's SHA-256 is `30832ad76ccfa4ce48ccb936edefe02079d42fb1da32201bf9e3a880c8ed6312`
+if you prefer. The Target/DSZ SHA-256s are not independently confirmed — compute
+them locally once the above pass.)
+
+## 3. API token
+
+GUI → Datacenter → Permissions → API Tokens → add `root@pam`, token id
+`ansible`, and **untick Privilege Separation** (so it inherits root's rights —
+fine for a lab). Copy the secret; it is shown once.
+
+## 4. Control node setup (on the PVE host)
+
+```bash
+apt install -y ansible genisoimage curl git
+git clone https://github.com/knightmare2600/DanderSpritz_lab.git
+cd DanderSpritz_lab
+git checkout danderspritz_lab-proxmox        # until PR #1 is merged to master
+cd danderspritz_lab
+ansible-galaxy collection install -r requirements.yml
+```
+
+## 5. Point it at your node
+
+Edit `group_vars/all.yml` — `proxmox_api_host`, `proxmox_node`, the storage
+names, `proxmox_lab_bridge: vmbr40`, and `proxmox_virtio_iso`. The ISO filenames
+already match what you staged. Then the secret:
+
+```bash
+cp group_vars/vault.yml.example group_vars/vault.yml
+vim group_vars/vault.yml                      # paste the real token secret
+ansible-vault encrypt group_vars/vault.yml
+```
+
+## 6. Prove it on ONE box first
+
+Build just the Win10 box — it has no domain dependency and exercises the two
+parts most likely to need a tweak (virtio driver injection + WinRM):
+
+```bash
+ansible-playbook build.yml -e lab_vm_filter=danderspritz --ask-vault-pass
+```
+
+Open that VM's console in the PVE GUI and **watch the install**. The make-or-break
+check: if Windows Setup reports it cannot find a disk, the virtio driver letter
+is wrong — press `Shift+F10`, run `diskpart` → `list volume` to find the virtio
+CD's letter, set `virtio_winpe_drive` in `roles/proxmox_vm/defaults/main.yml`,
+and retry. When it is up:
+
+```bash
+ansible danderspritz -m ansible.windows.win_ping --ask-vault-pass
+ansible-playbook configure.yml --limit danderspritz --ask-vault-pass
+```
+
+## 7. Build the whole lab
+
+```bash
+ansible-playbook site.yml --ask-vault-pass
+```
+
+This builds all three VMs, then configures them in order: common prep →
+**DC promoted** → target joins the domain → DSZ box. Expect long waits on the DC
+`dcpromo` (~15–30 min) and the Win7 SP1 install (~40 min); the playbook waits
+them out.
+
+If WinRM to the DC fails right after promotion (the local `vagrant` account
+becomes a domain account at that point), set
+`ansible_user: "windomain\\vagrant"` in `inventory/host_vars/dc.yml` and re-run
+`ansible-playbook configure.yml --limit dc --ask-vault-pass`.
+
+## 8. Prove the lab actually works
+
+On the DSZ box, run the FuzzBunch → EternalBlue → DoublePulsar → PeddleCheap
+walkthrough in the top-level [`README.md`](README.md). That is the real
+acceptance test — a green Ansible run alone does not prove the exploit path.
+
+---
+
+## Known rough edges
+
+- **virtio drive letter** (step 6) — the one assumption that cannot be verified
+  without a running node. Alternative: use a SATA disk and skip driver injection.
+- **Tool-download URL rot** — several of the old `scripts/*.ps1` fetch tools
+  (DanderSpritz, JRE 6u21, WinPython, FLARE packages) from the internet. Those
+  URLs were already fragile in the original project and some may have rotted;
+  this is why the lab bridge needs outbound internet during the build.
+
+## Day-to-day
+
+```bash
+# rebuild one box (destroy it in Proxmox first - build skips existing vmids)
+ansible-playbook build.yml -e lab_vm_filter=target --ask-vault-pass
+ansible-playbook configure.yml --limit target --ask-vault-pass
+
+# re-run configuration on a host
+ansible-playbook configure.yml --limit danderspritz --ask-vault-pass
+```

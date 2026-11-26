@@ -1,0 +1,78 @@
+---
+# Windows Server 2008 R2 -> windomain.local domain controller.
+# Mirrors the Packer DC build (dotnet45 / PS5 / dcpromo) followed by the Vagrant
+# DC provisioning (DNS, OUs, WEF + auditing/powershell GPOs).
+#
+# NOTE ON CREDENTIALS: once this host is promoted, the local `vagrant` account
+# becomes a domain account. If WinRM basic auth stops working afterwards, set in
+# inventory/host_vars/dc.yml:   ansible_user: "windomain\\vagrant"
+
+# --- .NET 4.5 ---------------------------------------------------------------
+- name: "DC | install .NET 4.5"
+  ansible.builtin.include_role:
+    name: common_windows
+    tasks_from: run_ps_scripts
+  vars:
+    ps_scripts:
+      - "WinDC\\Install-dotnet45.ps1"
+
+- name: "DC | reboot after .NET"
+  ansible.windows.win_reboot:
+    reboot_timeout: 900
+
+# --- PowerShell 5 + hostname ------------------------------------------------
+- name: "DC | install PowerShell 5 and set hostname"
+  ansible.builtin.include_role:
+    name: common_windows
+    tasks_from: run_ps_scripts
+  vars:
+    ps_scripts:
+      - "WinDC\\Install-Powershell5.ps1"
+      - "WinDC\\Set-Hostname-dc.ps1"
+
+- name: "DC | reboot after PowerShell 5 / rename"
+  ansible.windows.win_reboot:
+    reboot_timeout: 900
+
+# --- Promote to a domain controller ----------------------------------------
+- name: "DC | upload the dcpromo answer file"
+  ansible.windows.win_copy:
+    src: "{{ answer_files_dir }}/dcpromo_answer.txt"
+    dest: 'C:\Windows\Temp\dcpromo_answer.txt'
+
+- name: "DC | create the windomain.local domain (dcpromo)"
+  ansible.builtin.include_role:
+    name: common_windows
+    tasks_from: run_ps_scripts
+  vars:
+    ps_scripts:
+      - "WinDC\\Create-domain.ps1"
+
+- name: "DC | reboot after promotion (slow - forest creation)"
+  ansible.windows.win_reboot:
+    reboot_timeout: 1800
+    post_reboot_delay: 120
+
+- name: "DC | wait for AD web services / DС to be ready"
+  ansible.windows.win_shell: |
+    (Get-Service NTDS -ErrorAction SilentlyContinue).Status
+  register: ntds
+  retries: 30
+  delay: 20
+  until: ntds.stdout is search('Running')
+  changed_when: false
+
+# --- Post-promotion configuration (was the Vagrant DC provisioner) ---------
+- name: "DC | DNS, OUs, WEF subscriptions and GPOs"
+  ansible.builtin.include_role:
+    name: common_windows
+    tasks_from: run_ps_scripts
+  vars:
+    ps_scripts:
+      - "WinDC\\Set-DNS-and-Timezone.ps1"
+      - "WinDC\\Create-OUs.ps1"
+      - "WinDC\\Download-palantir-wef.ps1"
+      - "WinDC\\Install-wef-subscriptions.ps1"
+      - "WinDC\\Create-auditpolicy-gpos.ps1"
+      - "WinDC\\Create-powershell-gpo.ps1"
+      - "WinDC\\Create-wef-gpo.ps1"

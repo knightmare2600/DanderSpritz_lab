@@ -1,0 +1,11 @@
+---
+# Copy to vault.yml and encrypt:  ansible-vault encrypt group_vars/vault.yml
+# Then run playbooks with --ask-vault-pass (or a vault id).
+#
+# Keep real secrets OUT of git. vault.yml is gitignored; this .example is not.
+
+# Proxmox API token secret (Datacenter -> Permissions -> API Tokens).
+proxmox_api_token_secret: "CHANGE-ME-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# Override the lab admin password here if you don't want the vagrant default.
+# lab_admin_password: "something-else"
