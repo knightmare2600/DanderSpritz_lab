@@ -62,8 +62,62 @@
       no_log: true          # keep the API token out of logs
       changed_when: true
 
+    # --- Optional tools CD: vendored installers from ../tools -------------
+    - name: "{{ vm.name }} | build + upload the tools CD"
+      when: vm.tools_iso | default(false)
+      block:
+        - name: "{{ vm.name }} | tools ISO staging dir"
+          ansible.builtin.file:
+            path: "{{ proxmox_vm_build_dir }}/{{ vm.name }}/tools_root"
+            state: directory
+            mode: "0755"
+
+        # Copy only the mapped files (so a stray wrong-arch file in tools/ is
+        # never included).
+        - name: "{{ vm.name }} | stage mapped installers into the tools ISO root"
+          ansible.builtin.copy:
+            src: "{{ tools_dir }}/{{ item.src }}"
+            dest: "{{ proxmox_vm_build_dir }}/{{ vm.name }}/tools_root/{{ item.src }}"
+            remote_src: true
+            mode: "0644"
+          loop: "{{ danderspritz_tools }}"
+          loop_control:
+            label: "{{ item.src }}"
+
+        - name: "{{ vm.name }} | build the tools ISO"
+          ansible.builtin.command:
+            cmd: >-
+              genisoimage -quiet -J -r -V TOOLS
+              -o {{ proxmox_vm_build_dir }}/{{ vm.name }}-tools.iso
+              {{ proxmox_vm_build_dir }}/{{ vm.name }}/tools_root
+          changed_when: true
+
+        - name: "{{ vm.name }} | upload tools ISO to {{ proxmox_iso_storage }}"
+          ansible.builtin.command:
+            cmd: >-
+              curl --fail --silent --show-error
+              {{ '--insecure' if not proxmox_validate_certs else '' }}
+              -H "Authorization: PVEAPIToken={{ proxmox_api_user }}!{{ proxmox_api_token_id }}={{ proxmox_api_token_secret }}"
+              --form-string content=iso
+              -F "filename=@{{ proxmox_vm_build_dir }}/{{ vm.name }}-tools.iso;type=application/octet-stream"
+              "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/storage/{{ proxmox_iso_storage }}/upload"
+          no_log: true
+          changed_when: true
+
+    # --- Assemble the CD drive list (tools CD on ide3 when present) --------
+    - name: "{{ vm.name }} | assemble IDE cdrom drives"
+      ansible.builtin.set_fact:
+        _ide_drives: >-
+          {{ {
+               'ide2': proxmox_iso_storage ~ ':iso/' ~ vm.iso ~ ',media=cdrom',
+               'ide0': proxmox_iso_storage ~ ':iso/' ~ vm.name ~ '-unattend.iso,media=cdrom'
+             } | combine(
+               {'ide3': proxmox_iso_storage ~ ':iso/' ~ vm.name ~ '-tools.iso,media=cdrom'}
+               if (vm.tools_iso | default(false)) else {}
+             ) }}
+
     # --- Create the VM ----------------------------------------------------
-    - name: "{{ vm.name }} | create VM (virtio-scsi disk, virtio net, 3 CDs)"
+    - name: "{{ vm.name }} | create VM (virtio-scsi disk, virtio net, CDs)"
       community.general.proxmox_kvm:
         api_host: "{{ proxmox_api_host }}"
         api_user: "{{ proxmox_api_user }}"
@@ -81,11 +135,9 @@
         scsihw: virtio-scsi-single
         scsi:
           scsi0: "{{ proxmox_disk_storage }}:{{ vm.disk_gb }},cache=writeback"
-        ide:
-          # Windows install media (bootable fallback once disk is empty).
-          ide2: "{{ proxmox_iso_storage }}:iso/{{ vm.iso }},media=cdrom"
-          # Answer file - Setup auto-scans removable media for Autounattend.xml.
-          ide0: "{{ proxmox_iso_storage }}:iso/{{ vm.name }}-unattend.iso,media=cdrom"
+        # ide2 = install media (bootable fallback once disk is empty), ide0 =
+        # answer file (Setup auto-scans removable media), ide3 = tools CD if any.
+        ide: "{{ _ide_drives }}"
         sata:
           # virtio-win drivers, lettered in WinPE (see virtio_winpe_drive).
           sata0: "{{ proxmox_iso_storage }}:iso/{{ proxmox_virtio_iso }},media=cdrom"

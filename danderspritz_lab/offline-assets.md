@@ -11,25 +11,44 @@ depending on a URL staying alive.
 > access). Risk levels below are judgement from the source, not confirmed
 > reachability. Treat "HIGH" as "assume it's gone, vendor it".
 
-Drop the files into **`danderspritz_lab/files/offline/`** (create it) keeping the
-exact filenames below. Once they're in, tell me and I will wire the playbook /
-scripts to install from the local copy instead of the URL (the scripts currently
-hard-code the URLs, so vendoring alone does not change behaviour yet).
+## How vendored files are delivered — the tools CD
 
-## DanderSpritz box (Windows 10) — the important ones
+Vendored installers live in the repo's top-level **`tools/`** directory. At build
+time, `roles/proxmox_vm` builds a small ISO from the files mapped in
+`danderspritz_tools` (`group_vars/all.yml`), uploads it to Proxmox storage, and
+attaches it as a CD (ide3) to any VM with `tools_iso: true` (currently the
+DanderSpritz box). During configuration the guest copies them off that CD to
+where each `Install-*.ps1` expects them; the scripts now use the local copy if
+present and **fall back to downloading** if not — so the lab builds both offline
+and online. This avoids dragging the files over WinRM (slow) and is how larger
+additions (e.g. SP1) would be delivered too. The preflight SHA-256s everything
+in `tools/` against the mapping before a build starts.
 
-| Filename | What it is | Current source | Risk |
+> virtio drivers and the qemu guest agent are **not** vendored here — they come
+> from the `virtio-win.iso` attached at build time (drivers in the windowsPE
+> pass, agent installed by `common_windows`). No need to add them to `tools/`.
+
+## DanderSpritz box (Windows 10) — ✅ vendored & wired
+
+In `tools/`, delivered via the tools CD, SHA-256 pinned in `danderspritz_tools`:
+
+| Filename | What it is | Original source | Risk if not vendored |
 |----------|-----------|----------------|------|
 | `jre-6u21-windows-i586.exe` | Java 6u21 — the DanderSpritz/FuzzBunch GUI needs **Java 6** specifically | `ww2.chemistry.gatech.edu/software/JRE/...` (a university mirror) | **HIGH** |
-| `pywin32-221.win32-py2.6.exe` | pywin32 build 221 for Python 2.6 | SourceForge (`jaist.dl.sourceforge.net`) | **HIGH** |
+| `pywin32-221.win32-py2.6.exe` | pywin32 build 221 for **32-bit** Python 2.6 (must be `win32`, not `win-amd64`) | SourceForge (`jaist.dl.sourceforge.net`) | **HIGH** |
 | `python-2.6.6.msi` | Python 2.6.6 (32-bit) | `github.com/numpy/numpy-vendor/raw/master/...` | MEDIUM |
-| `EQGRP_Lost_in_Translation` (whole repo) | **DanderSpritz + FuzzBunch themselves** — `git clone`d to `C:\Users\vagrant\eqtools` | `github.com/x0rz/EQGRP_Lost_in_Translation.git` | MEDIUM — this is the crown jewel; vendor it as a zip or git submodule so a takedown can't kill the lab |
 
-## Target box (Windows 7)
+Still a live `git clone`, decision pending:
 
-| Filename | What it is | Current source | Risk |
-|----------|-----------|----------------|------|
-| `windows6.1-KB976932-X64.exe` | Windows 7 **SP1** (~903 MB; the script saves it as `KB976932-X64.exe`) | `download.microsoft.com/download/0/A/F/...` | LOW–MEDIUM (Microsoft-hosted, but large and worth caching) |
+| Item | What it is | Source | Notes |
+|------|-----------|--------|-------|
+| `EQGRP_Lost_in_Translation` (whole repo) | **DanderSpritz + FuzzBunch themselves** — `git clone`d to `C:\Users\vagrant\eqtools` | `github.com/x0rz/EQGRP_Lost_in_Translation.git` | MEDIUM — the crown jewel. Left as a live clone for now; submodule or vendored zip is the hardening option |
+
+## Target box (Windows 7) — kept as a live download
+
+| Filename | What it is | Source | Decision |
+|----------|-----------|--------|----------|
+| `windows6.1-KB976932-X64.exe` | Windows 7 **SP1** (~903 MB; the script saves it as `KB976932-X64.exe`) | `download.microsoft.com/download/0/A/F/...` | **Not vendored** — too big for comfort, and it's Microsoft-hosted (lowest rot risk). Left as a live download |
 
 ## Domain controller (Server 2008 R2)
 

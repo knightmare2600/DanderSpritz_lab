@@ -19,6 +19,22 @@
   ansible.windows.win_reboot:
     reboot_timeout: 900
 
+# Copy the vendored installers off the tools CD to exactly where the
+# Install-*.ps1 scripts look (they use the local file if present, else download).
+# Best-effort: if no tools CD is attached, each is reported "not on CD" and the
+# scripts fall back to their download.
+- name: "DSZ | stage vendored installers from the tools CD (if attached)"
+  ansible.windows.win_shell: |
+    $src = Get-PSDrive -PSProvider FileSystem |
+      ForEach-Object { Join-Path $_.Root '{{ item.src }}' } |
+      Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($src) { Copy-Item -LiteralPath $src -Destination '{{ item.dest }}' -Force; "staged {{ item.src }}" }
+    else { "not on CD, will download: {{ item.src }}" }
+  loop: "{{ danderspritz_tools }}"
+  loop_control:
+    label: "{{ item.src }}"
+  changed_when: true
+
 - name: "DSZ | install the DanderSpritz toolchain"
   ansible.builtin.include_role:
     name: common_windows

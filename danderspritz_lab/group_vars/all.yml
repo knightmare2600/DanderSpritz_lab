@@ -11,6 +11,23 @@ answer_files_dir: "{{ lab_repo_root }}/answer_files"
 # On-guest staging directory the scripts are copied to before they run.
 guest_stage_dir: 'C:\lab'
 
+# Vendored installers delivered on a "tools" CD (built from tools_dir and
+# attached to any VM with tools_iso: true), so they don't crawl over WinRM and
+# don't depend on rot-prone URLs. src = filename in ../tools/; dest = exactly
+# where the matching Install-*.ps1 expects it on the guest (the scripts now use
+# the local file if present and fall back to downloading if not).
+tools_dir: "{{ lab_repo_root }}/tools"
+danderspritz_tools:
+  - src: "jre-6u21-windows-i586.exe"
+    dest: 'C:\Windows\Temp\jre6u14.exe'
+    sha256: "3f97d83c3c822a78d3a486da42f814bfaf3296d747a43ab3566f6ac983a009c6"
+  - src: "python-2.6.6.msi"
+    dest: 'C:\Windows\Temp\python-2.6.6.msi'
+    sha256: "1192931440475d07fb3e9724531a53de34097ad24e519bff2e5f458c375a31b3"
+  - src: "pywin32-221.win32-py2.6.exe"
+    dest: 'C:\Windows\Temp\pywin32-py2.6.exe'
+    sha256: "82b62e100802db25607829b259fc9a61289761a0536e25075ca189b94949ac7c"
+
 # --- Network -----------------------------------------------------------------
 lab_domain: windomain.local
 lab_netbios: WINDOMAIN
@@ -109,3 +126,4 @@ lab_vms:
     disk_gb: 60
     ip: "{{ lab_dsz_ip }}"
     computer_name: "danderspritz10"
+    tools_iso: true          # attach the vendored-installers CD (danderspritz_tools)

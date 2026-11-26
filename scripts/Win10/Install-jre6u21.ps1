@@ -12,8 +12,10 @@
 
  Try
  {
-	 # Download JRe from public location
-	(New-Object System.Net.WebClient).DownloadFile('https://ww2.chemistry.gatech.edu/software/JRE/jre-6u21-windows-i586.exe', 'C:\Windows\Temp\jre6u14.exe')
+	 # Use a pre-staged copy (tools CD) if present, otherwise download it
+	if (!(Test-Path 'C:\Windows\Temp\jre6u14.exe')) {
+		(New-Object System.Net.WebClient).DownloadFile('https://ww2.chemistry.gatech.edu/software/JRE/jre-6u21-windows-i586.exe', 'C:\Windows\Temp\jre6u14.exe')
+	}
 	cmd /c C:\Windows\Temp\jre6u14.exe /s
  }
  Catch

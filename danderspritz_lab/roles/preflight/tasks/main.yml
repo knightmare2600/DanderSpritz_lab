@@ -92,3 +92,33 @@
   when:
     - preflight_verify_sha256 | bool
     - pf_pvesm.rc | default(1) != 0
+
+# --- Vendored tools (read straight from the repo on the control node) -------
+- name: "preflight | check the vendored tools for the selected VMs"
+  when: (_selected_vms | selectattr('tools_iso', 'defined') | selectattr('tools_iso') | list | length) > 0
+  block:
+    - name: "preflight | stat + SHA-256 each vendored installer in {{ tools_dir }}"
+      ansible.builtin.stat:
+        path: "{{ tools_dir }}/{{ item.src }}"
+        checksum_algorithm: sha256
+      loop: "{{ danderspritz_tools }}"
+      register: pf_tools
+      loop_control:
+        label: "{{ item.src }}"
+
+    - name: "preflight | each vendored installer exists with the expected SHA-256"
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.checksum == item.item.sha256
+        fail_msg: >-
+          {{ tools_dir }}/{{ item.item.src }}:
+          {{ 'missing from the tools/ dir'
+             if not item.stat.exists
+             else ('SHA-256 ' + item.stat.checksum + ' does not match expected '
+                   + item.item.sha256 + ' (wrong or corrupt file)') }}
+        success_msg: "{{ item.item.src }} — present, SHA-256 OK"
+        quiet: true
+      loop: "{{ pf_tools.results }}"
+      loop_control:
+        label: "{{ item.item.src }}"

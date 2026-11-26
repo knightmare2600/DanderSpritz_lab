@@ -4,3 +4,6 @@ configuration/*
 packer_cache/*.iso
 output*
 packer.log
+
+# Wrong-architecture pywin32 (needs win32, not amd64) - keep it out of the repo
+tools/pywin32-221.win-amd64-py2.6.exe

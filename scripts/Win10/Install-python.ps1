@@ -15,8 +15,10 @@
 
  Try
  {
-	 # Download Python MSI from github
-	(New-Object System.Net.WebClient).DownloadFile('https://github.com/numpy/numpy-vendor/raw/master/python-2.6.6.msi', 'C:\Windows\Temp\python-2.6.6.msi')
+	 # Use a pre-staged copy (tools CD) if present, otherwise download it
+	if (!(Test-Path 'C:\Windows\Temp\python-2.6.6.msi')) {
+		(New-Object System.Net.WebClient).DownloadFile('https://github.com/numpy/numpy-vendor/raw/master/python-2.6.6.msi', 'C:\Windows\Temp\python-2.6.6.msi')
+	}
 	msiexec /qn /i C:\Windows\Temp\python-2.6.6.msi /log C:\Windows\Temp\python.log
 
 	#set the new path permantently
