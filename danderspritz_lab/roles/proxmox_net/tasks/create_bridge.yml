@@ -15,8 +15,7 @@
   ansible.builtin.uri:
     url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/network"
     method: POST
-    headers:
-      Authorization: "PVEAPIToken={{ proxmox_api_user }}!{{ proxmox_api_token_id }}={{ proxmox_api_token_secret }}"
+    headers: "{{ _pve_write_headers }}"
     body_format: form-urlencoded
     body:
       iface: "{{ proxmox_lab_bridge }}"
@@ -33,8 +32,7 @@
   ansible.builtin.uri:
     url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/network"
     method: PUT
-    headers:
-      Authorization: "PVEAPIToken={{ proxmox_api_user }}!{{ proxmox_api_token_id }}={{ proxmox_api_token_secret }}"
+    headers: "{{ _pve_write_headers }}"
     validate_certs: "{{ proxmox_validate_certs }}"
   no_log: true
 

@@ -62,13 +62,25 @@ lab_admin_user: vagrant
 lab_admin_password: vagrant
 
 # ---------------------------------------------------------------------------
-# Proxmox connection + VM placement. Secrets come from vault (see
-# group_vars/vault.yml.example); never commit real tokens.
+# Proxmox connection + VM placement.
+#
+# Auth is either an API token (default, recommended) or a username+password.
+# The secret (token secret OR password) can come from a vault.yml, from
+# -e proxmox_secret_prompt=..., or be typed at the hidden prompt build.yml shows.
+#   proxmox_auth_method: token    -> uses proxmox_api_user + proxmox_api_token_id
+#                                    + the secret as the token secret
+#   proxmox_auth_method: password -> uses proxmox_api_user + the secret as the
+#                                    password (PVE realm included, e.g. root@pam)
 # ---------------------------------------------------------------------------
+proxmox_auth_method: token
 proxmox_api_host: "proxmox.lab.local"
 proxmox_api_user: "root@pam"
-proxmox_api_token_id: "ansible"
-# proxmox_api_token_secret: defined in vault.yml
+proxmox_api_token_id: "ansible"     # token mode only
+# The secret is NOT stored here. Provide it one of three ways:
+#   - type it at the hidden prompt when build.yml runs, or
+#   - -e proxmox_secret_prompt='...'  (unattended), or
+#   - define the matching var in group_vars/vault.yml and press Enter at the
+#     prompt: proxmox_api_token_secret (token) / proxmox_api_password (password)
 proxmox_node: "pve"
 proxmox_validate_certs: false
 

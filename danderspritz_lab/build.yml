@@ -9,8 +9,18 @@
 - name: Build DanderSpritz lab VMs on Proxmox
   hosts: localhost
   gather_facts: false
+  # Load vault.yml if it exists, otherwise harmlessly re-load all.yml (so a
+  # vault is optional — the Proxmox secret can come from the prompt below).
   vars_files:
-    - group_vars/vault.yml
+    - "{{ lookup('ansible.builtin.first_found', ['group_vars/vault.yml'], errors='ignore') | default('group_vars/all.yml', true) }}"
+  vars_prompt:
+    - name: proxmox_secret_prompt
+      prompt: |
+        Proxmox secret — API token secret (token mode) or password (password mode).
+        Press Enter to use a value from vault.yml or -e instead
+      private: true
+      default: ""
+      unsafe: true
   vars:
     # Normalise lab_vm_filter to a list of names, whether it arrives as a
     # comma-separated string (-e lab_vm_filter=dc,target) or a real list.
@@ -37,6 +47,10 @@
     - name: "Report which VMs this run will build"
       ansible.builtin.debug:
         msg: "Building: {{ _selected_vms | map(attribute='name') | list }}"
+
+    - name: "Resolve Proxmox credentials (token or password) into shared facts"
+      ansible.builtin.include_role:
+        name: proxmox_auth
 
     - name: "Ensure the isolated lab bridge exists (create if its name is free)"
       ansible.builtin.include_role:

@@ -1,0 +1,88 @@
+---
+# Resolve Proxmox credentials once and publish shared auth facts the other
+# roles use, so token vs password auth is handled in exactly one place.
+#
+# Publishes:
+#   _pve_get_headers    headers dict for API GETs       (uri)
+#   _pve_write_headers  headers dict for API POST/PUT    (uri)
+#   _pve_curl_auth      list of curl args for auth       (command argv)
+#   _pve_module_auth    dict of auth kwargs for proxmox_kvm / proxmox_vm_info
+#
+# Secret precedence: the hidden prompt (proxmox_secret_prompt) if non-empty,
+# otherwise the method's vault/-e variable (proxmox_api_token_secret or
+# proxmox_api_password).
+
+- name: "auth | resolve the effective secret"
+  ansible.builtin.set_fact:
+    _pve_secret: >-
+      {{ proxmox_secret_prompt
+         if (proxmox_secret_prompt | default('') | length > 0)
+         else ((proxmox_api_token_secret | default('')) if proxmox_auth_method == 'token'
+               else (proxmox_api_password | default(''))) }}
+  no_log: true
+
+- name: "auth | a secret must be available"
+  ansible.builtin.assert:
+    that:
+      - _pve_secret | length > 0
+    fail_msg: >-
+      No Proxmox secret available for auth method '{{ proxmox_auth_method }}'.
+      Type it at the prompt, pass -e proxmox_secret_prompt=..., or set
+      {{ 'proxmox_api_token_secret' if proxmox_auth_method == 'token' else 'proxmox_api_password' }}
+      in group_vars/vault.yml.
+    quiet: true
+
+- name: "auth | validate the auth method"
+  ansible.builtin.assert:
+    that:
+      - proxmox_auth_method in ['token', 'password']
+    fail_msg: "proxmox_auth_method must be 'token' or 'password' (got '{{ proxmox_auth_method }}')."
+    quiet: true
+
+# --- Token mode -------------------------------------------------------------
+- name: "auth | token-mode auth facts"
+  when: proxmox_auth_method == 'token'
+  vars:
+    _tok: "PVEAPIToken={{ proxmox_api_user }}!{{ proxmox_api_token_id }}={{ _pve_secret }}"
+  ansible.builtin.set_fact:
+    _pve_get_headers: { Authorization: "{{ _tok }}" }
+    _pve_write_headers: { Authorization: "{{ _tok }}" }
+    _pve_curl_auth: ["-H", "Authorization: {{ _tok }}"]
+    _pve_module_auth:
+      api_token_id: "{{ proxmox_api_token_id }}"
+      api_token_secret: "{{ _pve_secret }}"
+  no_log: true
+
+# --- Password mode: get a ticket, then use cookie + CSRF --------------------
+- name: "auth | obtain a PVE ticket (password mode)"
+  when: proxmox_auth_method == 'password'
+  ansible.builtin.uri:
+    url: "https://{{ proxmox_api_host }}:8006/api2/json/access/ticket"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      username: "{{ proxmox_api_user }}"
+      password: "{{ _pve_secret }}"
+    validate_certs: "{{ proxmox_validate_certs }}"
+    status_code: [200]
+  register: _pve_ticket
+  no_log: true
+
+- name: "auth | password-mode auth facts"
+  when: proxmox_auth_method == 'password'
+  vars:
+    _ticket: "{{ _pve_ticket.json.data.ticket }}"
+    _csrf: "{{ _pve_ticket.json.data.CSRFPreventionToken }}"
+  ansible.builtin.set_fact:
+    _pve_get_headers: { Cookie: "PVEAuthCookie={{ _ticket }}" }
+    _pve_write_headers:
+      Cookie: "PVEAuthCookie={{ _ticket }}"
+      CSRFPreventionToken: "{{ _csrf }}"
+    _pve_curl_auth:
+      - "--cookie"
+      - "PVEAuthCookie={{ _ticket }}"
+      - "-H"
+      - "CSRFPreventionToken: {{ _csrf }}"
+    _pve_module_auth:
+      api_password: "{{ _pve_secret }}"
+  no_log: true

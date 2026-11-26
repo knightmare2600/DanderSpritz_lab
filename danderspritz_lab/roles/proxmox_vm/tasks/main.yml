@@ -9,8 +9,9 @@
   community.general.proxmox_vm_info:
     api_host: "{{ proxmox_api_host }}"
     api_user: "{{ proxmox_api_user }}"
-    api_token_id: "{{ proxmox_api_token_id }}"
-    api_token_secret: "{{ proxmox_api_token_secret }}"
+    api_token_id: "{{ _pve_module_auth.api_token_id | default(omit) }}"
+    api_token_secret: "{{ _pve_module_auth.api_token_secret | default(omit) }}"
+    api_password: "{{ _pve_module_auth.api_password | default(omit) }}"
     validate_certs: "{{ proxmox_validate_certs }}"
     node: "{{ proxmox_node }}"
     vmid: "{{ vm.vmid }}"
@@ -48,18 +49,19 @@
 
     # --- Upload it into Proxmox ISO storage via the API ------------------
     # curl (not uri): the uri module's file lookup reads as text and corrupts a
-    # binary ISO. -F '...=@file' sends it correctly; literal fields use
-    # --form-string. --insecure mirrors proxmox_validate_certs=false.
+    # binary ISO. -F '...=@file' sends it correctly. argv form avoids shell
+    # quoting and lets the auth args (_pve_curl_auth: token header, or cookie +
+    # CSRF in password mode) be spliced in cleanly.
     - name: "{{ vm.name }} | upload answer-file ISO to {{ proxmox_iso_storage }}"
       ansible.builtin.command:
-        cmd: >-
-          curl --fail --silent --show-error
-          {{ '--insecure' if not proxmox_validate_certs else '' }}
-          -H "Authorization: PVEAPIToken={{ proxmox_api_user }}!{{ proxmox_api_token_id }}={{ proxmox_api_token_secret }}"
-          --form-string content=iso
-          -F "filename=@{{ proxmox_vm_build_dir }}/{{ vm.name }}-unattend.iso;type=application/octet-stream"
-          "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/storage/{{ proxmox_iso_storage }}/upload"
-      no_log: true          # keep the API token out of logs
+        argv: >-
+          {{ ['curl', '--fail', '--silent', '--show-error']
+             + (['--insecure'] if not proxmox_validate_certs else [])
+             + _pve_curl_auth
+             + ['--form-string', 'content=iso',
+                '-F', 'filename=@' ~ proxmox_vm_build_dir ~ '/' ~ vm.name ~ '-unattend.iso;type=application/octet-stream',
+                'https://' ~ proxmox_api_host ~ ':8006/api2/json/nodes/' ~ proxmox_node ~ '/storage/' ~ proxmox_iso_storage ~ '/upload'] }}
+      no_log: true          # keep the API secret out of logs
       changed_when: true
 
     # --- Optional tools CD: vendored installers from ../tools -------------
@@ -113,13 +115,13 @@
 
         - name: "{{ vm.name }} | upload tools ISO to {{ proxmox_iso_storage }}"
           ansible.builtin.command:
-            cmd: >-
-              curl --fail --silent --show-error
-              {{ '--insecure' if not proxmox_validate_certs else '' }}
-              -H "Authorization: PVEAPIToken={{ proxmox_api_user }}!{{ proxmox_api_token_id }}={{ proxmox_api_token_secret }}"
-              --form-string content=iso
-              -F "filename=@{{ proxmox_vm_build_dir }}/{{ vm.name }}-tools.iso;type=application/octet-stream"
-              "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/storage/{{ proxmox_iso_storage }}/upload"
+            argv: >-
+              {{ ['curl', '--fail', '--silent', '--show-error']
+                 + (['--insecure'] if not proxmox_validate_certs else [])
+                 + _pve_curl_auth
+                 + ['--form-string', 'content=iso',
+                    '-F', 'filename=@' ~ proxmox_vm_build_dir ~ '/' ~ vm.name ~ '-tools.iso;type=application/octet-stream',
+                    'https://' ~ proxmox_api_host ~ ':8006/api2/json/nodes/' ~ proxmox_node ~ '/storage/' ~ proxmox_iso_storage ~ '/upload'] }}
           no_log: true
           changed_when: true
 
@@ -140,8 +142,9 @@
       community.general.proxmox_kvm:
         api_host: "{{ proxmox_api_host }}"
         api_user: "{{ proxmox_api_user }}"
-        api_token_id: "{{ proxmox_api_token_id }}"
-        api_token_secret: "{{ proxmox_api_token_secret }}"
+        api_token_id: "{{ _pve_module_auth.api_token_id | default(omit) }}"
+        api_token_secret: "{{ _pve_module_auth.api_token_secret | default(omit) }}"
+        api_password: "{{ _pve_module_auth.api_password | default(omit) }}"
         validate_certs: "{{ proxmox_validate_certs }}"
         node: "{{ proxmox_node }}"
         vmid: "{{ vm.vmid }}"
@@ -175,8 +178,9 @@
       community.general.proxmox_kvm:
         api_host: "{{ proxmox_api_host }}"
         api_user: "{{ proxmox_api_user }}"
-        api_token_id: "{{ proxmox_api_token_id }}"
-        api_token_secret: "{{ proxmox_api_token_secret }}"
+        api_token_id: "{{ _pve_module_auth.api_token_id | default(omit) }}"
+        api_token_secret: "{{ _pve_module_auth.api_token_secret | default(omit) }}"
+        api_password: "{{ _pve_module_auth.api_password | default(omit) }}"
         validate_certs: "{{ proxmox_validate_certs }}"
         node: "{{ proxmox_node }}"
         vmid: "{{ vm.vmid }}"

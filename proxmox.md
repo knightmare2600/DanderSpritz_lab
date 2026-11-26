@@ -116,34 +116,49 @@ A wrong name or hash stops the run immediately instead of part-way through a
 long build. The hashing reads multi-GB files, so skip it for a fast run with
 `-e preflight_verify_sha256=false`.
 
-## 3. API token
+## 3. Proxmox credentials
 
-GUI → Datacenter → Permissions → API Tokens → add `root@pam`, token id
-`ansible`, and **untick Privilege Separation** (so it inherits root's rights —
-fine for a lab). Copy the secret; it is shown once.
+Two auth methods, set by `proxmox_auth_method` in `group_vars/all.yml`:
+
+- **`token`** (default, recommended): GUI → Datacenter → Permissions → API
+  Tokens → add `root@pam`, token id `ansible`, and **untick Privilege
+  Separation** (so it inherits root's rights — fine for a lab). Copy the secret;
+  it is shown once. Set `proxmox_api_user: root@pam` and
+  `proxmox_api_token_id: ansible`.
+- **`password`**: just a PVE login — set `proxmox_api_user` to the account
+  (realm included, e.g. `root@pam`). No token needed; the playbook logs in for a
+  ticket itself.
+
+Either way the **secret** (token secret or password) is supplied at run time —
+see step 5. Nothing secret goes in `group_vars/all.yml`.
 
 ## 4. Control node setup (on the PVE host)
 
 ```bash
 apt install -y ansible genisoimage curl git
 git clone https://github.com/knightmare2600/DanderSpritz_lab.git
-cd DanderSpritz_lab
-git checkout danderspritz_lab-proxmox        # until PR #1 is merged to master
-cd danderspritz_lab
+cd DanderSpritz_lab/danderspritz_lab
 ansible-galaxy collection install -r requirements.yml
 ```
 
-## 5. Point it at your node
+## 5. Point it at your node, and the secret
 
-Edit `group_vars/all.yml` — `proxmox_api_host`, `proxmox_node`, the storage
-names, `proxmox_lab_bridge: vmbr40`, and `proxmox_virtio_iso`. The ISO filenames
-already match what you staged. Then the secret:
+Edit `group_vars/all.yml` — `proxmox_auth_method`, `proxmox_api_host`,
+`proxmox_node`, the storage names, `proxmox_lab_bridge`, and `proxmox_virtio_iso`.
+The ISO filenames already match what you staged.
 
-```bash
-cp group_vars/vault.yml.example group_vars/vault.yml
-vim group_vars/vault.yml                      # paste the real token secret
-ansible-vault encrypt group_vars/vault.yml
-```
+The secret is **not** stored in `all.yml`. Provide it whichever way suits:
+
+- **Prompt (simplest):** run `build.yml`/`site.yml` and type it at the hidden
+  prompt (`Proxmox secret — …`). Nothing to set up.
+- **Unattended:** pass it on the command line, e.g.
+  `-e proxmox_secret_prompt='xxxx'` (press-Enter is skipped).
+- **Vault:** store it encrypted and press Enter at the prompt to fall back to it:
+  ```bash
+  cp group_vars/vault.yml.example group_vars/vault.yml
+  vim group_vars/vault.yml      # proxmox_api_token_secret (token) OR proxmox_api_password
+  ansible-vault encrypt group_vars/vault.yml   # then run with --ask-vault-pass
+  ```
 
 ## 6. Prove it on ONE box first
 
@@ -202,9 +217,9 @@ acceptance test — a green Ansible run alone does not prove the exploit path.
 
 ## Ways to run it
 
-There are two phases and you can run them together or separately. `--ask-vault-pass`
-(or a vault id) is needed on every run because the Proxmox token lives in the
-vault.
+There are two phases and you can run them together or separately. `build.yml`
+prompts (hidden) for the Proxmox secret unless you pass `-e proxmox_secret_prompt=…`
+or keep it in a vault (add `--ask-vault-pass` only if you use a vault).
 
 ### The playbooks
 
@@ -229,6 +244,8 @@ vault.
 
 | Variable | Default | What it changes |
 |----------|---------|-----------------|
+| `proxmox_auth_method` | `token` | `token` (API token) or `password` (PVE login). See section 3. |
+| `proxmox_secret_prompt` | *(prompted)* | The token secret / password. Pass `-e proxmox_secret_prompt=…` for unattended runs instead of typing it. |
 | `lab_network_mode` | `managed` | `managed` / `existing` / `tagged` — see section 1. |
 | `lab_vlan` | `""` | VLAN id for `tagged` mode. |
 | `proxmox_lab_bridge` | `vmbr40` | Bridge to create (managed) or attach to (existing/tagged). |

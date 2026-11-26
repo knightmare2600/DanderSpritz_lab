@@ -9,7 +9,7 @@
   hosts: windows
   gather_facts: false
   vars_files:
-    - group_vars/vault.yml
+    - "{{ lookup('ansible.builtin.first_found', ['group_vars/vault.yml'], errors='ignore') | default('group_vars/all.yml', true) }}"
   roles:
     - common_windows
 
@@ -17,7 +17,7 @@
   hosts: dc
   gather_facts: false
   vars_files:
-    - group_vars/vault.yml
+    - "{{ lookup('ansible.builtin.first_found', ['group_vars/vault.yml'], errors='ignore') | default('group_vars/all.yml', true) }}"
   roles:
     - domain_controller
 
@@ -25,7 +25,7 @@
   hosts: target
   gather_facts: false
   vars_files:
-    - group_vars/vault.yml
+    - "{{ lookup('ansible.builtin.first_found', ['group_vars/vault.yml'], errors='ignore') | default('group_vars/all.yml', true) }}"
   roles:
     - target
 
@@ -33,6 +33,6 @@
   hosts: danderspritz
   gather_facts: false
   vars_files:
-    - group_vars/vault.yml
+    - "{{ lookup('ansible.builtin.first_found', ['group_vars/vault.yml'], errors='ignore') | default('group_vars/all.yml', true) }}"
   roles:
     - danderspritz

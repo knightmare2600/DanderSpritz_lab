@@ -245,10 +245,12 @@ small Debian LXC/VM with a NIC on `vmbr40`.
    `cd danderspritz_lab && ansible-galaxy collection install -r requirements.yml`.
 2. **Stage ISOs** into the node's ISO storage (verified as above), plus the
    latest stable `virtio-win.iso`.
-3. **API token:** Datacenter → Permissions → API Tokens → add `root@pam` token
-   `ansible`; for a lab, untick *Privilege Separation*. Put the secret in
-   `group_vars/vault.yml` (copy `vault.yml.example`) and
-   `ansible-vault encrypt group_vars/vault.yml`.
+3. **Proxmox auth** (`proxmox_auth_method`): either an **API token** (default —
+   Datacenter → Permissions → API Tokens → add `root@pam` token `ansible`,
+   untick *Privilege Separation* for a lab) or a **username+password** PVE login.
+   The secret isn't stored in `all.yml`: type it at the hidden prompt `build.yml`
+   shows, pass `-e proxmox_secret_prompt=…`, or keep it in an (optional) encrypted
+   `group_vars/vault.yml`. See `proxmox.md` §3.
 4. **Point the playbook at your node** in `group_vars/all.yml`
    (`proxmox_api_host`, `proxmox_node`, storage names, `proxmox_lab_bridge`,
    `proxmox_virtio_iso`). The ISO filenames already match the table above.

@@ -1,11 +1,19 @@
 ---
+# Using a vault is OPTIONAL. The Proxmox secret can instead be typed at the
+# hidden prompt build.yml shows, or passed with -e proxmox_secret_prompt=...
+# Use this file only if you prefer to store the secret encrypted.
+#
 # Copy to vault.yml and encrypt:  ansible-vault encrypt group_vars/vault.yml
 # Then run playbooks with --ask-vault-pass (or a vault id).
-#
 # Keep real secrets OUT of git. vault.yml is gitignored; this .example is not.
 
-# Proxmox API token secret (Datacenter -> Permissions -> API Tokens).
+# Provide ONE, matching proxmox_auth_method in group_vars/all.yml:
+
+# token mode — the API token secret (Datacenter -> Permissions -> API Tokens):
 proxmox_api_token_secret: "CHANGE-ME-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# password mode — the PVE account password for proxmox_api_user:
+# proxmox_api_password: "CHANGE-ME"
 
 # Override the lab admin password here if you don't want the vagrant default.
 # lab_admin_password: "something-else"

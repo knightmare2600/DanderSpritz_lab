@@ -1,7 +1,7 @@
 ---
 # Ensure an isolated lab bridge exists, creating it only if its name is free.
 # Runs on the control node (uses the Proxmox API); expects the proxmox_* vars
-# incl. proxmox_api_token_secret from vault.
+# and the shared _pve_* auth facts published by roles/proxmox_auth.
 
 - name: "net | resolve a free bridge name, then create it"
   when: lab_network_mode == 'managed'
