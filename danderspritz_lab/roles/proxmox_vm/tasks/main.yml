@@ -215,7 +215,7 @@
         # answer file (Setup auto-scans removable media), ide3 = tools CD if any.
         ide: "{{ _ide_drives }}"
         sata:
-          # virtio-win drivers, lettered in WinPE (see virtio_winpe_drive).
+          # virtio-win drivers, lettered in WinPE (see virtio_winpe_drives).
           sata0: "{{ proxmox_iso_storage }}:iso/{{ proxmox_virtio_iso }},media=cdrom"
         net:
           # In 'tagged' mode the NIC carries VLAN lab_vlan (a BYO firewall VM on

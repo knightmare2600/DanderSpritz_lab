@@ -257,8 +257,9 @@ small Debian LXC/VM with a NIC on `vmbr40`.
 5. **Build one VM first** to prove virtio + WinRM, using `lab_vm_filter` to pick
    just the Win10 box (no file editing):
    `ansible-playbook build.yml -e lab_vm_filter=danderspritz --ask-vault-pass`,
-   and watch the console. If Setup can't find the disk, fix `virtio_winpe_drive`
-   in `roles/proxmox_vm/defaults/main.yml`. Then
+   and watch the console. If Setup can't find the disk, widen
+   `virtio_winpe_drives` in `roles/proxmox_vm/defaults/main.yml` (it already
+   covers C:–H:). Then
    `ansible-playbook configure.yml --limit danderspritz --ask-vault-pass`.
 6. **Build everything:** `ansible-playbook site.yml --ask-vault-pass`
    (`lab_vm_filter` defaults to `all`). Order is handled: all VMs built, then

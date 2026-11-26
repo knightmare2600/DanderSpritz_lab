@@ -169,11 +169,13 @@ parts most likely to need a tweak (virtio driver injection + WinRM):
 ansible-playbook build.yml -e lab_vm_filter=danderspritz --ask-vault-pass
 ```
 
-Open that VM's console in the PVE GUI and **watch the install**. The make-or-break
-check: if Windows Setup reports it cannot find a disk, the virtio driver letter
-is wrong — press `Shift+F10`, run `diskpart` → `list volume` to find the virtio
-CD's letter, set `virtio_winpe_drive` in `roles/proxmox_vm/defaults/main.yml`,
-and retry. When it is up:
+Open that VM's console in the PVE GUI and **watch the install**. The answer file
+offers the virtio driver from the virtio-win CD across drive letters C:–H:
+(`virtio_winpe_drives`), so Setup should find the disk automatically. If it still
+reports it cannot find a disk (or "could not apply the DiskConfiguration"), press
+`Shift+F10`, run `diskpart` → `list volume` to see the virtio CD's letter, and
+widen `virtio_winpe_drives` in `roles/proxmox_vm/defaults/main.yml` if it's
+outside that range, then retry. When it is up:
 
 ```bash
 ansible danderspritz -m ansible.windows.win_ping --ask-vault-pass

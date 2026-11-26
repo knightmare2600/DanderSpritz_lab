@@ -84,10 +84,11 @@ An unknown name fails the run early with the list of valid names.
 These are the parts that genuinely differ from VirtualBox and are most likely to
 need a tweak for your node — none are hand-waved:
 
-- **virtio driver drive letter.** `virtio_winpe_drive` (default `E:`) in
-  `roles/proxmox_vm/defaults/main.yml` is the letter WinPE gives the virtio CD
-  during install. If Setup can't see the disk, boot the installer, press
-  `Shift+F10`, check the CD letter, and change this. Alternative: use SATA for
+- **virtio driver drive letter.** `virtio_winpe_drives` (default `C:`–`H:`) in
+  `roles/proxmox_vm/defaults/main.yml` are the letters the answer file offers the
+  virtio CD at during install; whichever one it actually is gets the driver.
+  If Setup still can't see the disk, boot the installer, press `Shift+F10`, check
+  the CD letter, and widen the list. Alternative: use SATA for
   the disk and skip injection.
 - **Post-promotion DC credentials.** After `dcpromo`, `vagrant` becomes a domain
   account; you may need `ansible_user: "windomain\\vagrant"` (see

@@ -68,10 +68,14 @@
         </component>
             <component name="Microsoft-Windows-PnpCustomizationsWinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
             <DriverPaths>
+{% set ns = namespace(k=0) %}
+{% for drive in virtio_winpe_drives %}
 {% for p in (virtio_driver_subpaths[vm.os_short] | default([])) %}
-                <PathAndCredentials wcm:action="add" wcm:keyValue="{{ loop.index }}">
-                    <Path>{{ virtio_winpe_drive }}\{{ p }}</Path>
+{% set ns.k = ns.k + 1 %}
+                <PathAndCredentials wcm:action="add" wcm:keyValue="{{ ns.k }}">
+                    <Path>{{ drive }}\{{ p }}</Path>
                 </PathAndCredentials>
+{% endfor %}
 {% endfor %}
             </DriverPaths>
         </component>

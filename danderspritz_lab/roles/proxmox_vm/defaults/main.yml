@@ -2,12 +2,19 @@
 # Local working area on the control node for building per-VM answer-file ISOs.
 proxmox_vm_build_dir: "/tmp/danderspritz_lab_build"
 
-# Drive letter WinPE assigns to the virtio-win CD during the windowsPE pass.
-# Injected into <DriverPaths> in the answer file. With install ISO on ide2 and
-# virtio ISO on sata0, WinPE commonly letters the virtio CD as E:. If Setup
-# can't find the disk, boot the installer, Shift+F10, run `diskpart`/`wmic
-# logicaldisk get caption` to confirm, and change this.
-virtio_winpe_drive: "E:"
+# Candidate drive letters for the virtio-win CD during the windowsPE pass. With
+# four optical drives attached (install + unattend + tools + virtio), WinPE's
+# letter for the virtio CD isn't predictable, so <DriverPaths> is emitted for
+# ALL of these — whichever one the virtio CD actually is gets the driver loaded,
+# and the rest are harmlessly skipped by Setup. Widen the range if your layout
+# needs it; a wrong/extra letter is not fatal.
+virtio_winpe_drives:
+  - "C:"
+  - "D:"
+  - "E:"
+  - "F:"
+  - "G:"
+  - "H:"
 
 # Per-OS virtio-win driver sub-paths (relative to the virtio CD root). Keys are
 # lab_vms[].os_short. vioscsi = storage (needed in windowsPE to see the disk),
