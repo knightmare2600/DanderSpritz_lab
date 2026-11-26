@@ -151,8 +151,9 @@ You'll have to reboot the machine.
 
 If you run Proxmox VE rather than VirtualBox, the `danderspritz_lab/` directory
 contains an Ansible port that builds the same three-host lab directly on a PVE
-node. Vagrant and Packer are **not** required. The full reference lives in
-[`danderspritz_lab/README.md`](danderspritz_lab/README.md); this is the summary.
+node. Vagrant and Packer are **not** required. This is the summary; for a
+start-to-finish runbook see [`proxmox.md`](proxmox.md), and for the full
+reference [`danderspritz_lab/README.md`](danderspritz_lab/README.md).
 
 ### What's going on
 
