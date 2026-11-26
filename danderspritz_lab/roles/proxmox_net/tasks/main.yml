@@ -4,7 +4,7 @@
 # incl. proxmox_api_token_secret from vault.
 
 - name: "net | resolve a free bridge name, then create it"
-  when: lab_bridge_autocreate | bool
+  when: lab_network_mode == 'managed'
   block:
     # Phase 1: settle on a bridge name that is NOT already in use (may prompt
     # and recurse). Only sets proxmox_lab_bridge; does not create anything.

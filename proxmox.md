@@ -25,43 +25,63 @@ exploit test.
 
 ---
 
-## 1. Network: isolated bridge with a NAT gateway
+## 1. Network
 
-Two ways to get the bridge. **Pick one** — don't do both (the playbook refuses to
-reuse an existing bridge, so a hand-made `vmbr40` would make the auto-create path
-stop and ask for a different name).
+Three modes, set by `lab_network_mode` in `group_vars/all.yml`. **Pick one.**
+Whichever you choose, the guests need **outbound** internet during the build
+(SP1, Chocolatey, FLARE), so something has to route/NAT the lab subnet.
 
-**Either (A) let `build.yml` create it** — leave `lab_bridge_autocreate: true`
-(default) and do *not* make the bridge by hand. On build, `roles/proxmox_net`
-checks the API: if `proxmox_lab_bridge` (e.g. `vmbr40`) is free it creates an
-isolated bridge (no uplink, gateway IP, comment `danderspritz-lab`); if the name
-is already taken it stops and asks you for a different `vmbrN`, re-checking until
-you give a free one. The API **cannot** add the outbound NAT, so after it runs,
-add the masquerade rule on the node (the `post-up`/`post-down` lines below) and
-`ifreload -a`.
+### `managed` (default) — the playbook makes an isolated bridge, the host NATs
 
-**Or (B) make it by hand** (and set `lab_bridge_autocreate: false` so the
-playbook leaves your bridge alone). Add to `/etc/network/interfaces`, swapping
-`vmbr0` for your WAN-facing bridge:
+Leave `lab_network_mode: managed` and do *not* make the bridge by hand. On build,
+`roles/proxmox_net` checks the API: if `proxmox_lab_bridge` (e.g. `vmbr40`) is
+free it creates an isolated bridge (no uplink, gateway IP, comment
+`danderspritz-lab`); if the name is already taken it stops and asks for a
+different `vmbrN`, re-checking until you give a free one. The API **cannot** add
+the outbound NAT, so after it runs add the masquerade rule on the node:
 
 ```
+# /etc/network/interfaces — swap vmbr0 for your WAN-facing bridge
 auto vmbr40
 iface vmbr40 inet static
     address 192.168.40.1/24
-    bridge-ports none
-    bridge-stp off
-    bridge-fd 0
     post-up   iptables -t nat -A POSTROUTING -s 192.168.40.0/24 -o vmbr0 -j MASQUERADE
     post-down iptables -t nat -D POSTROUTING -s 192.168.40.0/24 -o vmbr0 -j MASQUERADE
 ```
-
 ```bash
-echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf && sysctl -p
-ifreload -a
+echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf && sysctl -p && ifreload -a
 ```
 
-Either way the guests need outbound during the build (SP1, Chocolatey, FLARE),
-so the NAT matters — it's the one piece the auto-create path can't do for you.
+### `existing` — attach to a bridge you already have, you do the routing
+
+Set `lab_network_mode: existing` and `proxmox_lab_bridge` to your bridge. The
+playbook touches no host networking; your existing setup routes/NATs the lab
+subnet. `lab_gateway` must be whatever gateway lives on that network.
+
+### `tagged` — bring your own firewall VM on a VLAN
+
+Set `lab_network_mode: tagged`, `proxmox_lab_bridge` to your existing bridge
+(e.g. `vmbr0`), and `lab_vlan` to a VLAN id (e.g. `40`). Every lab VM's NIC is
+then an access port on that VLAN (`virtio,bridge=vmbr0,tag=40`). You run your
+**own firewall VM** — pfSense, OPNsense, IPFire, etc. — with a leg on the same
+bridge+VLAN, and *it* is the lab's gateway/NAT/DHCP. The playbook creates no
+bridge and does no host NAT.
+
+With this model:
+- Give the firewall VM's LAN interface the address you set as `lab_gateway`
+  (default `192.168.40.1`); the lab guests already point their gateway there.
+- The firewall VM's WAN leg goes on a bridge with an uplink; its LAN leg on the
+  tagged VLAN. It provides the outbound path, so no host NAT is needed.
+- **Isolation caveat:** a VLAN tag only isolates the lab if VLAN `lab_vlan` is
+  not trunked out of the node to somewhere it shouldn't go. On a single node with
+  a VLAN-aware bridge that's automatic; if `vmbr0` has a physical uplink, make
+  sure your switch doesn't carry that VLAN anywhere you care about. The firewall
+  VM's WAN should be the lab's only way out.
+
+> DHCP vs static: the answer files set **static** IPs (`192.168.40.2/3/4`), so
+> the guests come up reachable regardless of whether your firewall VM also runs
+> DHCP. Just make sure its LAN IP is `lab_gateway` and it isn't handing out those
+> three addresses to anything else.
 
 ## 2. Stage the ISOs (verified) into PVE storage
 

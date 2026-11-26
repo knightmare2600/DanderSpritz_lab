@@ -1,9 +1,9 @@
 ---
-# Check for the lab bridge via the Proxmox API and create it if its name is
-# free. If the name is already in use, the run stops and asks for a different
-# vmbrN name (an existing bridge is never reused or modified), re-checking until
-# a free one is given. Set false to skip and manage the bridge yourself.
-lab_bridge_autocreate: true
+# This role only acts in 'managed' mode (lab_network_mode). It checks for the
+# lab bridge via the Proxmox API and creates it if its name is free; if the name
+# is already in use it stops and asks for a different vmbrN name (an existing
+# bridge is never reused or modified), re-checking until a free one is given.
+# In 'existing'/'tagged' mode the role does nothing (you own the networking).
 
 # Friendly label stored in the bridge's comment (Proxmox bridge *interfaces*
 # must be named vmbrN, so the name itself cannot be "danderspritz-lab").

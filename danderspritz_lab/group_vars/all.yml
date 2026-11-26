@@ -76,8 +76,25 @@ proxmox_validate_certs: false
 proxmox_iso_storage: "local"       # content type: iso
 proxmox_disk_storage: "local-lvm"  # content type: images
 
-# Isolated bridge for the lab network. Create this on the node first; it must
-# NOT be bridged to anything you care about.
+# How the lab VMs are put on the network. Pick one:
+#   managed  - the playbook creates a dedicated isolated bridge (roles/proxmox_net)
+#              named proxmox_lab_bridge, and you add the host NAT so the guests
+#              reach the internet (default; see proxmox.md). The PVE host routes.
+#   existing - attach to an existing bridge (proxmox_lab_bridge) untagged; the
+#              playbook does NOT touch host networking. You own the routing/NAT.
+#   tagged   - attach to an existing bridge with VLAN tag lab_vlan, and run your
+#              OWN firewall VM (pfSense/IPFire/OPNsense/...) on that VLAN as the
+#              lab's gateway/NAT/DHCP. The playbook does NOT touch host networking
+#              and creates no bridge. This is the "bring your own firewall" model.
+lab_network_mode: managed
+
+# VLAN id for 'tagged' mode (e.g. 40). Ignored in the other modes.
+lab_vlan: ""
+
+# The bridge the VMs attach to. In 'managed' mode the playbook creates it (must
+# be vmbrN and free); in 'existing'/'tagged' mode set it to YOUR existing bridge
+# (e.g. vmbr0). It must not be bridged to anything you care about (managed mode),
+# or VLAN lab_vlan must be isolated upstream (tagged mode).
 proxmox_lab_bridge: "vmbr40"
 
 # virtio-win driver ISO, pre-staged into proxmox_iso_storage. Injected into the
