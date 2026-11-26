@@ -11,6 +11,8 @@
     - name: "net | find an unused bridge name"
       ansible.builtin.include_tasks: resolve_bridge_name.yml
 
-    # Phase 2: create that (now confirmed-free) bridge, once.
+    # Phase 2: create that bridge, once — unless phase 1 found it already exists
+    # and is ours (then we just reuse it).
     - name: "net | create the isolated bridge '{{ proxmox_lab_bridge }}'"
       ansible.builtin.include_tasks: create_bridge.yml
+      when: _pve_bridge_create_needed | default(true)
