@@ -63,31 +63,48 @@
   ansible.windows.win_reboot:
     reboot_timeout: 1200
 
-# --- FLARE reversing toolset + sysmon ---------------------------------------
-- name: "Target | vcredist, FLARE repo and RE tooling"
+# --- Essential tooling (from the Chocolatey community feed; must succeed) ----
+- name: "Target | vcredist, Sysinternals, Sysmon, hostname, autologon"
   ansible.builtin.include_role:
     name: common_windows
     tasks_from: run_ps_scripts
   vars:
     ps_scripts:
       - "Target\\Install-vcredist2015.ps1"
-      - "Target\\Set-ChocolateyFLARERepo.ps1"
       - "Target\\show-hidden-files.ps1"
       - "Target\\Install-Sysinternals.ps1"
-      - "Target\\Install-FLAREAPIMonitor.ps1"
-      - "Target\\Install-FLAREEXEInfoPE.ps1"
-      - "Target\\Install-FLAREHXD.ps1"
-      - "Target\\Install-FLAREPEID.ps1"
-      - "Target\\Install-FLAREPEView.ps1"
-      - "Target\\Install-FLAREWindbg.ps1"
-      - "Target\\Install-FLAREWireshark.ps1"
-      - "Target\\Install-FLAREBinaryNinja.ps1"
-      - "Target\\Install-FLAREHashCalc.ps1"
-      - "Target\\Install-FLAREIDAFree.ps1"
-      - "Target\\Install-FLAREOllydbg2.ps1"
       - "Target\\Install-Sysmon.ps1"
       - "Target\\Set-Hostname.ps1"
       - "autologon.ps1"
+
+# --- FLARE reversing toolset (OPTIONAL, best-effort) ------------------------
+# The old FLARE myget feed (myget.org/F/flare) now serves none of these
+# packages, and current FLARE-VM requires Windows >= 10, so on this Win7 target
+# these installs are expected to fail. They are optional analysis tooling, not
+# part of the exploit chain, so a failure here must NOT abort the build or block
+# the domain join. Set target_install_flare: false to skip them entirely.
+- name: "Target | FLARE RE tooling (optional; feed may be dead)"
+  when: target_install_flare | bool
+  block:
+    - name: "Target | add FLARE repo and install RE tools (non-fatal)"
+      ansible.builtin.include_role:
+        name: common_windows
+        tasks_from: run_ps_scripts
+      vars:
+        ps_ignore_errors: true     # attempt each; never fatal
+        ps_scripts:
+          - "Target\\Set-ChocolateyFLARERepo.ps1"
+          - "Target\\Install-FLAREAPIMonitor.ps1"
+          - "Target\\Install-FLAREEXEInfoPE.ps1"
+          - "Target\\Install-FLAREHXD.ps1"
+          - "Target\\Install-FLAREPEID.ps1"
+          - "Target\\Install-FLAREPEView.ps1"
+          - "Target\\Install-FLAREWindbg.ps1"
+          - "Target\\Install-FLAREWireshark.ps1"
+          - "Target\\Install-FLAREBinaryNinja.ps1"
+          - "Target\\Install-FLAREHashCalc.ps1"
+          - "Target\\Install-FLAREIDAFree.ps1"
+          - "Target\\Install-FLAREOllydbg2.ps1"
 
 - name: "Target | reboot before domain join"
   ansible.windows.win_reboot:

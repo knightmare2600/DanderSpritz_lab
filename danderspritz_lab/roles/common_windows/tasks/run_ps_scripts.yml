@@ -13,3 +13,8 @@
   loop: "{{ ps_scripts }}"
   register: ps_run
   changed_when: true
+  # When ps_ignore_errors is set, a non-zero exit is tolerated (best-effort
+  # steps like the optional FLARE tools); otherwise a failing script is fatal.
+  failed_when:
+    - not (ps_ignore_errors | default(false) | bool)
+    - (ps_run.rc | default(0)) != 0

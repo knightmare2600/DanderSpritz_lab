@@ -236,6 +236,7 @@ vault.
 | `preflight_check_isos` | `true` | `false` skips the ISO storage preflight entirely. |
 | `fetch_eqgrp` *(per VM)* | `true` on DSZ | `false` → don't download the toolset to the CD; guest falls back to `git clone`. |
 | `tools_iso` *(per VM)* | `true` on DSZ | whether to build/attach the vendored-installers CD. |
+| `target_install_flare` | `true` | Attempt the FLARE RE tools on the Win7 target. They're optional and **non-fatal** (the old feed is dead — see `offline-assets.md`); `false` skips the step entirely. |
 
 ### Common recipes
 

@@ -1,0 +1,8 @@
+---
+# Attempt the FLARE reverse-engineering tools on the Win7 target. These are
+# optional analysis tooling, never fatal (see roles/target/tasks/main.yml): the
+# old FLARE myget feed no longer serves them and current FLARE-VM needs Windows
+# >= 10, so on Win7 they are expected to be unavailable. Left true so the step
+# still runs (and would work if a compatible source were configured); set false
+# to skip it outright for a faster, quieter Target build.
+target_install_flare: true

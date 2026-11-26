@@ -64,15 +64,24 @@ Downloaded at build time and baked onto the tools CD (not in the repo — ~200 M
   `vcredist2015`, `sysinternals`, `sysmon`. These generally still resolve.
   Risk: LOW–MEDIUM.
 - **FLARE myget feed** (`myget.org/F/flare`, added by
-  `scripts/Target/Set-ChocolateyFLARERepo.ps1`) provides the reversing tools:
-  `windbg`, `peid`, `exeinfope`, `peview`, `ollydbg2`, `apimonitor`, `hxd`,
-  `wireshark`, `binaryninja`, `hashcalc`, `ida` (free). **Risk: HIGH** — FLARE-VM
-  moved its package source off this myget feed years ago, so it is very likely
-  defunct. If so, these installs fail and the Target comes up without the RE
-  tools (the lab still exploits fine; it just lacks the analysis kit). Fixing
-  this properly means either pointing at the current FLARE-VM package source or
-  vendoring each tool — a bigger job than the single-file list above, so worth a
-  separate decision.
+  `scripts/Target/Set-ChocolateyFLARERepo.ps1`) was the source for the Target's
+  reversing tools: `apimonitor`, `exeinfope`, `hxd`, `peid`, `peview`, `windbg`,
+  `wireshark.flare`, `binaryninja`, `hashcalc`, `idafree70`, `ollydbg2`.
+  **Status: effectively dead for this lab (verified Nov 2025).** The feed's index
+  URL still responds, but an OData `FindPackagesById` query for every one of
+  those IDs returns an *empty* feed — none are served any more. Separately,
+  current FLARE-VM has moved to `myget.org/F/vm-packages` and now **requires
+  Windows ≥ 10 / PowerShell ≥ 5 / Chocolatey ≥ 2**, so repointing the Win7
+  target at the new feed is not a fix (those packages won't install on Win7).
+
+  **How the playbook handles it:** these installs are now **optional and
+  non-fatal** (`roles/target`, gated by `target_install_flare`, default `true`).
+  They are split out of the essential tooling, so a dead feed no longer aborts
+  the Target build or the domain join — the tools are simply skipped with a
+  warning. Set `target_install_flare: false` to skip them outright. The lab's
+  exploit chain does not use them. Reinstating them would mean individually
+  sourcing Win7-compatible builds and vendoring them onto the tools CD — a
+  separate project, not a feed URL swap.
 
 ---
 
