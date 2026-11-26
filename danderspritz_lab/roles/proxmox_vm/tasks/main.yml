@@ -129,8 +129,36 @@
                  + ['--form-string', 'content=iso',
                     '-F', 'filename=@' ~ proxmox_vm_build_dir ~ '/' ~ vm.name ~ '-tools.iso;type=application/octet-stream',
                     'https://' ~ proxmox_api_host ~ ':8006/api2/json/nodes/' ~ proxmox_node ~ '/storage/' ~ proxmox_iso_storage ~ '/upload'] }}
+          register: _tools_upload
           no_log: true
           changed_when: true
+
+        # The upload endpoint returns a task id (UPID) and copies the (large)
+        # file into storage asynchronously. Wait for THAT task to finish — a
+        # file-listing check passes too early for a 240MB ISO.
+        - name: "{{ vm.name }} | wait for the tools ISO upload task to finish"
+          ansible.builtin.uri:
+            url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/tasks/{{ (_tools_upload.stdout | from_json).data }}/status"
+            method: GET
+            headers: "{{ _pve_get_headers }}"
+            validate_certs: "{{ proxmox_validate_certs }}"
+          register: _tools_task
+          until: _tools_task.json.data.status == 'stopped'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: "{{ vm.name }} | the tools ISO upload task must have succeeded"
+          ansible.builtin.assert:
+            that:
+              - _tools_task.json.data.exitstatus | default('') == 'OK'
+            fail_msg: >-
+              The tools ISO upload task did not succeed
+              (exitstatus={{ _tools_task.json.data.exitstatus | default('unknown') }}).
+              A ~240MB upload through the PVE API can be unreliable; consider
+              fetch_eqgrp=false (smaller CD, guest clones the toolset) or staging
+              the ISO on the node another way.
+            quiet: true
 
     # The upload API returns as soon as curl's request is accepted, but a large
     # volume (the tools ISO) can take a moment to register in storage. Wait for
