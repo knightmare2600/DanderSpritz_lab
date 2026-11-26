@@ -11,14 +11,30 @@
 Set-StrictMode -Version Latest
 
 
-Try 
+Try
 {
-	#Try to clone the git repo into eqtools
-    git clone https://github.com/x0rz/EQGRP_Lost_in_Translation.git C:\Users\vagrant\eqtools
+    $eqtools = 'C:\Users\vagrant\eqtools'
+    $zip = 'C:\Windows\Temp\EQGRP_Lost_in_Translation-master.zip'
+    if (Test-Path $zip) {
+        # Offline: expand the pre-staged archive (baked onto the tools CD) so
+        # the guest needs neither git nor internet for the toolset.
+        $tmp = 'C:\Windows\Temp\eqgrp_extract'
+        if (Test-Path $tmp) { Remove-Item -Recurse -Force $tmp }
+        Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
+        # GitHub archives nest everything under a single <repo>-<ref> folder;
+        # flatten it so eqtools\windows (etc.) line up with the clone layout.
+        $inner = Get-ChildItem -Path $tmp -Directory | Select-Object -First 1
+        if (Test-Path $eqtools) { Remove-Item -Recurse -Force $eqtools }
+        Move-Item -LiteralPath $inner.FullName -Destination $eqtools
+    }
+    else {
+        #Fall back to cloning the git repo into eqtools
+        git clone https://github.com/x0rz/EQGRP_Lost_in_Translation.git $eqtools
+    }
 }
-Catch 
+Catch
 {
-    Write-Host "Failed to clone EQ tools repo...exiting"  
+    Write-Host "Failed to obtain EQ tools (zip or clone)...exiting"
     Exit 1
 }
 

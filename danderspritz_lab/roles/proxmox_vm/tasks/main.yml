@@ -84,6 +84,25 @@
           loop_control:
             label: "{{ item.src }}"
 
+        # The DanderSpritz toolset is too big for the repo: download it once
+        # (cached) on the control node and bake it onto the same CD.
+        - name: "{{ vm.name }} | download the DanderSpritz toolset (cached)"
+          ansible.builtin.get_url:
+            url: "{{ eqgrp_url }}"
+            dest: "{{ eqgrp_cache_dir }}/{{ eqgrp_zip_name }}"
+            force: false
+            timeout: 120
+            mode: "0644"
+          when: vm.fetch_eqgrp | default(false)
+
+        - name: "{{ vm.name }} | add the toolset zip to the tools ISO root"
+          ansible.builtin.copy:
+            src: "{{ eqgrp_cache_dir }}/{{ eqgrp_zip_name }}"
+            dest: "{{ proxmox_vm_build_dir }}/{{ vm.name }}/tools_root/{{ eqgrp_zip_name }}"
+            remote_src: true
+            mode: "0644"
+          when: vm.fetch_eqgrp | default(false)
+
         - name: "{{ vm.name }} | build the tools ISO"
           ansible.builtin.command:
             cmd: >-

@@ -28,6 +28,16 @@ danderspritz_tools:
     dest: 'C:\Windows\Temp\pywin32-py2.6.exe'
     sha256: "82b62e100802db25607829b259fc9a61289761a0536e25075ca189b94949ac7c"
 
+# DanderSpritz/FuzzBunch toolset. ~200 MB zipped — too big for the repo or LFS,
+# so build.yml downloads it once on the control node and bakes it onto the tools
+# CD; the guest expands it from the CD instead of git-cloning (no git/internet
+# needed on the guest). For a reproducible build, pin a commit in the URL
+# (.../zip/<commit-sha>) rather than a moving branch tip. Set fetch_eqgrp: false
+# on a VM to skip the download and let the guest fall back to `git clone`.
+eqgrp_url: "https://codeload.github.com/x0rz/EQGRP_Lost_in_Translation/zip/refs/heads/master"
+eqgrp_zip_name: "EQGRP_Lost_in_Translation-master.zip"
+eqgrp_cache_dir: "{{ proxmox_vm_build_dir }}/cache"
+
 # --- Network -----------------------------------------------------------------
 lab_domain: windomain.local
 lab_netbios: WINDOMAIN
@@ -127,3 +137,4 @@ lab_vms:
     ip: "{{ lab_dsz_ip }}"
     computer_name: "danderspritz10"
     tools_iso: true          # attach the vendored-installers CD (danderspritz_tools)
+    fetch_eqgrp: true         # download the DanderSpritz toolset and add it to that CD

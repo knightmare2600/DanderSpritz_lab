@@ -38,11 +38,11 @@ In `tools/`, delivered via the tools CD, SHA-256 pinned in `danderspritz_tools`:
 | `pywin32-221.win32-py2.6.exe` | pywin32 build 221 for **32-bit** Python 2.6 (must be `win32`, not `win-amd64`) | SourceForge (`jaist.dl.sourceforge.net`) | **HIGH** |
 | `python-2.6.6.msi` | Python 2.6.6 (32-bit) | `github.com/numpy/numpy-vendor/raw/master/...` | MEDIUM |
 
-Still a live `git clone`, decision pending:
+Downloaded at build time and baked onto the tools CD (not in the repo — ~200 MB):
 
-| Item | What it is | Source | Notes |
-|------|-----------|--------|-------|
-| `EQGRP_Lost_in_Translation` (whole repo) | **DanderSpritz + FuzzBunch themselves** — `git clone`d to `C:\Users\vagrant\eqtools` | `github.com/x0rz/EQGRP_Lost_in_Translation.git` | MEDIUM — the crown jewel. Left as a live clone for now; submodule or vendored zip is the hardening option |
+| Item | What it is | Source | Handling |
+|------|-----------|--------|----------|
+| `EQGRP_Lost_in_Translation` | **DanderSpritz + FuzzBunch themselves** — extracted to `C:\Users\vagrant\eqtools` | `codeload.github.com/x0rz/EQGRP_Lost_in_Translation/zip/refs/heads/master` (`eqgrp_url`) | `build.yml` downloads it once on the control node (cached in `eqgrp_cache_dir`), adds the zip to the tools CD, and the guest expands it — no git/internet needed on the guest. `Install-DanderSpritz.ps1` falls back to `git clone` if the zip isn't staged. Pin a commit in `eqgrp_url` for a reproducible build; set `fetch_eqgrp: false` to skip and clone on the guest instead. |
 
 ## Target box (Windows 7) — kept as a live download
 

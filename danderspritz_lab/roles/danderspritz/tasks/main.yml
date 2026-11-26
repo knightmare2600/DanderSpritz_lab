@@ -35,6 +35,15 @@
     label: "{{ item.src }}"
   changed_when: true
 
+- name: "DSZ | stage the DanderSpritz toolset zip from the tools CD (if present)"
+  ansible.windows.win_shell: |
+    $src = Get-PSDrive -PSProvider FileSystem |
+      ForEach-Object { Join-Path $_.Root '{{ eqgrp_zip_name }}' } |
+      Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($src) { Copy-Item -LiteralPath $src -Destination 'C:\Windows\Temp\{{ eqgrp_zip_name }}' -Force; "staged {{ eqgrp_zip_name }}" }
+    else { "not on CD, Install-DanderSpritz will git clone instead" }
+  changed_when: true
+
 - name: "DSZ | install the DanderSpritz toolchain"
   ansible.builtin.include_role:
     name: common_windows
