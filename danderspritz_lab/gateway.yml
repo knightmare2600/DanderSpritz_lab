@@ -6,23 +6,36 @@
 #
 #   ansible-playbook gateway.yml -e lab_network_mode=routed \
 #     -e proxmox_api_host=<node-ip> -e proxmox_node=<node-name>
+#
+# SSH auth to the node: type the root password at the prompt, or leave it blank
+# to use an SSH key/agent. (Password auth needs `sshpass` on the control node.)
 
 - name: Register the PVE node for SSH (routed mode)
   hosts: localhost
   gather_facts: false
+  vars_prompt:
+    - name: node_ssh_password
+      prompt: |
+        Root SSH password for the PVE node
+        (press Enter to use an SSH key/agent instead)
+      private: true
+      default: ""
+      unsafe: true
   tasks:
     - name: "Add the PVE node as an SSH target"
       ansible.builtin.add_host:
         name: lab_pve_node
+        groups: proxmox_nodes
         ansible_host: "{{ proxmox_node_ssh_host | default(proxmox_api_host) }}"
         ansible_user: "{{ proxmox_node_ssh_user | default('root') }}"
         ansible_connection: ssh
-        groups: lab_pve_node
+        ansible_password: "{{ node_ssh_password if (node_ssh_password | length > 0) else omit }}"
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=accept-new"
       when: lab_network_mode == 'routed'
       changed_when: false
 
 - name: Build the lab NAT gateway (routed mode)
-  hosts: lab_pve_node
+  hosts: proxmox_nodes
   gather_facts: true
   roles:
     - proxmox_gateway
