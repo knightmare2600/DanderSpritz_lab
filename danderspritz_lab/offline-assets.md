@@ -42,7 +42,7 @@ Downloaded at build time and baked onto the tools CD (not in the repo — ~200 M
 
 | Item | What it is | Source | Handling |
 |------|-----------|--------|----------|
-| `EQGRP_Lost_in_Translation` | **DanderSpritz + FuzzBunch themselves** — extracted to `C:\Users\vagrant\eqtools` | `codeload.github.com/x0rz/EQGRP_Lost_in_Translation/zip/refs/heads/master` (`eqgrp_url`) | `build.yml` downloads it once on the control node (cached in `eqgrp_cache_dir`), adds the zip to the tools CD, and the guest expands it — no git/internet needed on the guest. `Install-DanderSpritz.ps1` falls back to `git clone` if the zip isn't staged. Pin a commit in `eqgrp_url` for a reproducible build; set `fetch_eqgrp: false` to skip and clone on the guest instead. |
+| `EQGRP_Lost_in_Translation` | **DanderSpritz + FuzzBunch themselves** — extracted to `C:\Users\vagrant\eqtools` | `codeload.github.com/x0rz/EQGRP_Lost_in_Translation/zip/refs/heads/master` (`eqgrp_url`) | `build.yml` downloads it once on the control node (cached in `eqgrp_cache_dir`), adds the zip to the tools CD, and the guest expands it — no git/internet needed on the guest. `Install-DanderSpritz.ps1` falls back to `git clone` if the zip isn't staged. The upstream repo has been dormant ~9 years, so the master archive is effectively a fixed snapshot — pinning a commit in `eqgrp_url` is optional. Set `fetch_eqgrp: false` to skip and clone on the guest instead. |
 
 ## Target box (Windows 7) — kept as a live download
 

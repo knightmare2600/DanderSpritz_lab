@@ -31,9 +31,10 @@ danderspritz_tools:
 # DanderSpritz/FuzzBunch toolset. ~200 MB zipped — too big for the repo or LFS,
 # so build.yml downloads it once on the control node and bakes it onto the tools
 # CD; the guest expands it from the CD instead of git-cloning (no git/internet
-# needed on the guest). For a reproducible build, pin a commit in the URL
-# (.../zip/<commit-sha>) rather than a moving branch tip. Set fetch_eqgrp: false
-# on a VM to skip the download and let the guest fall back to `git clone`.
+# needed on the guest). The upstream repo has been dormant for ~9 years, so the
+# master archive is effectively a fixed snapshot; pin a commit (.../zip/<sha>)
+# only if you want to guard against that changing. Set fetch_eqgrp: false on a
+# VM to skip the download and let the guest fall back to `git clone`.
 eqgrp_url: "https://codeload.github.com/x0rz/EQGRP_Lost_in_Translation/zip/refs/heads/master"
 eqgrp_zip_name: "EQGRP_Lost_in_Translation-master.zip"
 eqgrp_cache_dir: "{{ proxmox_vm_build_dir }}/cache"
