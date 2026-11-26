@@ -132,6 +132,25 @@
           no_log: true
           changed_when: true
 
+    # The upload API returns as soon as curl's request is accepted, but a large
+    # volume (the tools ISO) can take a moment to register in storage. Wait for
+    # the uploaded ISOs to actually appear before referencing them in the VM.
+    - name: "{{ vm.name }} | wait for the uploaded ISOs to register in storage"
+      ansible.builtin.uri:
+        url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/storage/{{ proxmox_iso_storage }}/content?content=iso"
+        method: GET
+        headers: "{{ _pve_get_headers }}"
+        validate_certs: "{{ proxmox_validate_certs }}"
+      register: _iso_registered
+      vars:
+        _expected_uploaded: "{{ [vm.name ~ '-unattend.iso'] + ([vm.name ~ '-tools.iso'] if (vm.tools_iso | default(false)) else []) }}"
+      until: >-
+        (_expected_uploaded | difference(_iso_registered.json.data
+          | map(attribute='volid') | map('regex_replace', '^.*/', '') | list)) | length == 0
+      retries: 40
+      delay: 5
+      no_log: true
+
     # --- Assemble the CD drive list (tools CD on ide3 when present) --------
     - name: "{{ vm.name }} | assemble IDE cdrom drives"
       ansible.builtin.set_fact:
