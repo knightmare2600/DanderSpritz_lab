@@ -1,0 +1,61 @@
+---
+# Validate / choose the Proxmox storages, via the API, before any build work.
+# Runs on the control node; expects the proxmox_* vars and the _pve_* auth facts
+# from roles/proxmox_auth.
+
+- name: "storage | check and (if needed) choose storages"
+  when: proxmox_storage_check | bool
+  block:
+    - name: "storage | list storages on {{ proxmox_node }}"
+      ansible.builtin.uri:
+        url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/storage"
+        method: GET
+        headers: "{{ _pve_get_headers }}"
+        validate_certs: "{{ proxmox_validate_certs }}"
+      register: pve_storages
+      no_log: true
+
+    - name: "storage | candidate storages by content type"
+      ansible.builtin.set_fact:
+        _img_candidates: >-
+          {{ pve_storages.json.data
+             | selectattr('content', 'defined')
+             | selectattr('content', 'search', '(^|,)images(,|$)')
+             | map(attribute='storage') | list }}
+        _iso_candidates: >-
+          {{ pve_storages.json.data
+             | selectattr('content', 'defined')
+             | selectattr('content', 'search', '(^|,)iso(,|$)')
+             | map(attribute='storage') | list }}
+
+    - name: "storage | the node must offer an images-capable and an iso-capable storage"
+      ansible.builtin.assert:
+        that:
+          - _img_candidates | length > 0
+          - _iso_candidates | length > 0
+        fail_msg: >-
+          No suitable storage on {{ proxmox_node }} —
+          images-capable: {{ _img_candidates }}, iso-capable: {{ _iso_candidates }}.
+        quiet: true
+
+    # --- disk storage (needs 'images') ---------------------------------------
+    - name: "storage | resolve the VM-disk storage"
+      ansible.builtin.set_fact:
+        _sel_kind: images
+        _sel_candidates: "{{ _img_candidates }}"
+        _sel_current: "{{ proxmox_disk_storage }}"
+    - ansible.builtin.include_tasks: select_storage.yml
+    - name: "storage | use '{{ _sel_result }}' for VM disks"
+      ansible.builtin.set_fact:
+        proxmox_disk_storage: "{{ _sel_result }}"
+
+    # --- ISO storage (needs 'iso') -------------------------------------------
+    - name: "storage | resolve the ISO storage"
+      ansible.builtin.set_fact:
+        _sel_kind: iso
+        _sel_candidates: "{{ _iso_candidates }}"
+        _sel_current: "{{ proxmox_iso_storage }}"
+    - ansible.builtin.include_tasks: select_storage.yml
+    - name: "storage | use '{{ _sel_result }}' for ISOs"
+      ansible.builtin.set_fact:
+        proxmox_iso_storage: "{{ _sel_result }}"

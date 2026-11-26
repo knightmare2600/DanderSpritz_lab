@@ -1,0 +1,6 @@
+---
+# Check (via the API) that the configured storages can hold what the lab needs
+# — proxmox_disk_storage must support 'images', proxmox_iso_storage must support
+# 'iso' — and, when one doesn't, list the node's valid storages and prompt for a
+# choice. Set false to skip (e.g. fully unattended with known-good values).
+proxmox_storage_check: true

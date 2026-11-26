@@ -1,0 +1,28 @@
+---
+# Recursive. Operates on the facts _sel_kind, _sel_candidates, _sel_current and
+# sets _sel_result to a storage that IS in _sel_candidates — prompting (with the
+# first candidate as the default) until the current value is valid.
+
+- name: "storage | '{{ _sel_current }}' is a valid {{ _sel_kind }} storage"
+  ansible.builtin.set_fact:
+    _sel_result: "{{ _sel_current }}"
+  when: _sel_current in _sel_candidates
+
+- name: "storage | '{{ _sel_current }}' is not {{ _sel_kind }}-capable — choose one"
+  when: _sel_current not in _sel_candidates
+  block:
+    - name: "storage | prompt for a {{ _sel_kind }} storage"
+      ansible.builtin.pause:
+        prompt: |
+
+          Storage '{{ _sel_current }}' is not {{ _sel_kind }}-capable on {{ proxmox_node }}.
+          Available {{ _sel_kind }} storage: {{ _sel_candidates | join(', ') }}
+          Enter one to use [{{ _sel_candidates[0] }}]
+      register: _storage_prompt
+
+    - name: "storage | adopt the choice (Enter = {{ _sel_candidates[0] }})"
+      ansible.builtin.set_fact:
+        _sel_current: "{{ (_storage_prompt.user_input | trim) or _sel_candidates[0] }}"
+
+    - name: "storage | re-check the choice"
+      ansible.builtin.include_tasks: select_storage.yml

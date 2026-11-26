@@ -52,6 +52,10 @@
       ansible.builtin.include_role:
         name: proxmox_auth
 
+    - name: "Check / choose the Proxmox storages (disk + ISO)"
+      ansible.builtin.include_role:
+        name: proxmox_storage
+
     - name: "Ensure the isolated lab bridge exists (create if its name is free)"
       ansible.builtin.include_role:
         name: proxmox_net

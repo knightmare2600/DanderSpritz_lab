@@ -249,6 +249,7 @@ or keep it in a vault (add `--ask-vault-pass` only if you use a vault).
 | `lab_network_mode` | `managed` | `managed` / `existing` / `tagged` — see section 1. |
 | `lab_vlan` | `""` | VLAN id for `tagged` mode. |
 | `proxmox_lab_bridge` | `vmbr40` | Bridge to create (managed) or attach to (existing/tagged). |
+| `proxmox_storage_check` | `true` | Validate `proxmox_disk_storage` (needs `images`) and `proxmox_iso_storage` (needs `iso`) against the node; if wrong, list the valid storages and prompt for a choice. `false` skips (unattended with known-good values). |
 | `preflight_verify_sha256` | `true` | `false` skips the slow multi-GB ISO hashing (presence/name check still runs). |
 | `preflight_check_isos` | `true` | `false` skips the ISO storage preflight entirely. |
 | `fetch_eqgrp` *(per VM)* | `true` on DSZ | `false` → don't download the toolset to the CD; guest falls back to `git clone`. |
