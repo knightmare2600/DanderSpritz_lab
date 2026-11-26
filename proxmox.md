@@ -200,13 +200,65 @@ acceptance test — a green Ansible run alone does not prove the exploit path.
   direct-download files worth vendoring into the repo are listed in
   [`danderspritz_lab/offline-assets.md`](danderspritz_lab/offline-assets.md).
 
-## Day-to-day
+## Ways to run it
+
+There are two phases and you can run them together or separately. `--ask-vault-pass`
+(or a vault id) is needed on every run because the Proxmox token lives in the
+vault.
+
+### The playbooks
+
+| Command | What it does |
+|---------|--------------|
+| `ansible-playbook site.yml` | **Everything**: ensure the bridge (managed mode) → preflight ISOs/tools → build all VMs → configure all guests. The whole lab from scratch. |
+| `ansible-playbook build.yml` | **Phase 1 only** (control node → Proxmox API): ensure the bridge, preflight, create the VMs from ISO + answer file (+ tools CD), power on, wait for WinRM. Idempotent — a VM whose `vmid` exists is left alone. |
+| `ansible-playbook configure.yml` | **Phase 2 only** (over WinRM): common prep → DC promotion → target domain join → DanderSpritz box. Re-applies guest state; safe to re-run. |
+
+### Scoping which hosts
+
+| Flag | Applies to | Effect |
+|------|-----------|--------|
+| `-e lab_vm_filter=dc,target` | `build.yml` | Build only these VMs (comma list, or `all`). Unknown name fails early. Default `all`. |
+| `--limit danderspritz` | `configure.yml` | Configure only this guest (inventory name: `dc`, `target`, `danderspritz`). |
+
+> Note the asymmetry: `build.yml` loops a list on the control node, so it uses
+> `-e lab_vm_filter=…`, **not** `--limit`. `configure.yml` targets real inventory
+> hosts, so it uses `--limit`.
+
+### Behaviour toggles (`-e VAR=…` on the command line, or in `group_vars`)
+
+| Variable | Default | What it changes |
+|----------|---------|-----------------|
+| `lab_network_mode` | `managed` | `managed` / `existing` / `tagged` — see section 1. |
+| `lab_vlan` | `""` | VLAN id for `tagged` mode. |
+| `proxmox_lab_bridge` | `vmbr40` | Bridge to create (managed) or attach to (existing/tagged). |
+| `preflight_verify_sha256` | `true` | `false` skips the slow multi-GB ISO hashing (presence/name check still runs). |
+| `preflight_check_isos` | `true` | `false` skips the ISO storage preflight entirely. |
+| `fetch_eqgrp` *(per VM)* | `true` on DSZ | `false` → don't download the toolset to the CD; guest falls back to `git clone`. |
+| `tools_iso` *(per VM)* | `true` on DSZ | whether to build/attach the vendored-installers CD. |
+
+### Common recipes
 
 ```bash
-# rebuild one box (destroy it in Proxmox first - build skips existing vmids)
+# Full lab, from nothing
+ansible-playbook site.yml --ask-vault-pass
+
+# Prove the hard parts on one box first (virtio + WinRM), then configure it
+ansible-playbook build.yml -e lab_vm_filter=danderspritz --ask-vault-pass
+ansible-playbook configure.yml --limit danderspritz --ask-vault-pass
+
+# Fast build — skip the ISO hashing (e.g. you already trust the storage)
+ansible-playbook build.yml -e preflight_verify_sha256=false --ask-vault-pass
+
+# Rebuild one box from scratch (destroy it in Proxmox first — build skips
+# existing vmids)
 ansible-playbook build.yml -e lab_vm_filter=target --ask-vault-pass
 ansible-playbook configure.yml --limit target --ask-vault-pass
 
-# re-run configuration on a host
-ansible-playbook configure.yml --limit danderspritz --ask-vault-pass
+# Just re-run configuration on a host (no rebuild)
+ansible-playbook configure.yml --limit dc --ask-vault-pass
+
+# Use your own firewall VM on a tagged VLAN instead of host NAT
+ansible-playbook site.yml -e lab_network_mode=tagged -e lab_vlan=40 \
+  -e proxmox_lab_bridge=vmbr0 --ask-vault-pass
 ```
