@@ -1,22 +1,15 @@
 ---
-# Recursive. Operates on the facts _sel_kind, _sel_candidates, _sel_current and
-# sets _sel_result to a storage that IS in _sel_candidates — prompting (with the
-# first candidate as the default) until the current value is valid.
-#
-# The prompt block is gated on _sel_ok, a fact computed once at THIS level, not
-# on _sel_current directly: the block mutates _sel_current, and a block-level
-# `when` referencing it would flip mid-block and skip the recursive re-check.
+# Non-recursive. Validate _sel_current against _sel_candidates; if it isn't
+# valid, prompt ONCE (default = first candidate). Always set _sel_result, then
+# assert it is valid — a bad manual entry fails with guidance rather than looping
+# (recursion here is a trap: a block/include `when` propagates into the included
+# tasks and flips mid-flight once a fact is mutated).
 
 - name: "storage | is '{{ _sel_current }}' a valid {{ _sel_kind }} storage?"
   ansible.builtin.set_fact:
     _sel_ok: "{{ _sel_current in _sel_candidates }}"
 
-- name: "storage | '{{ _sel_current }}' is a valid {{ _sel_kind }} storage"
-  ansible.builtin.set_fact:
-    _sel_result: "{{ _sel_current }}"
-  when: _sel_ok | bool
-
-- name: "storage | '{{ _sel_current }}' is not {{ _sel_kind }}-capable — choose one"
+- name: "storage | choose a {{ _sel_kind }} storage"
   when: not (_sel_ok | bool)
   block:
     - name: "storage | prompt for a {{ _sel_kind }} storage"
@@ -32,5 +25,16 @@
       ansible.builtin.set_fact:
         _sel_current: "{{ (_storage_prompt.user_input | trim) or _sel_candidates[0] }}"
 
-    - name: "storage | re-check the choice"
-      ansible.builtin.include_tasks: select_storage.yml
+- name: "storage | record the chosen {{ _sel_kind }} storage"
+  ansible.builtin.set_fact:
+    _sel_result: "{{ _sel_current }}"
+
+- name: "storage | the chosen {{ _sel_kind }} storage must be valid"
+  ansible.builtin.assert:
+    that:
+      - _sel_result in _sel_candidates
+    fail_msg: >-
+      '{{ _sel_result }}' is not a {{ _sel_kind }}-capable storage on
+      {{ proxmox_node }}. Valid: {{ _sel_candidates | join(', ') }}. Re-run and
+      pick one, or set proxmox_{{ 'disk' if _sel_kind == 'images' else 'iso' }}_storage.
+    quiet: true

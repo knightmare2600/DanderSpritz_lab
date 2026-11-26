@@ -1,10 +1,8 @@
 ---
-# Recursive. On exit, proxmox_lab_bridge is a name that is either (a) not present
-# on the node, or (b) present and OURS (carries the lab_bridge_comment), and
-# _pve_bridge_create_needed says whether create_bridge.yml must run.
-#
-# A bridge of that name that is NOT ours is never reused or modified: the run
-# prompts for a different vmbrN and re-checks.
+# Non-recursive. Classify proxmox_lab_bridge; if a FOREIGN bridge (no
+# lab_bridge_comment) holds the name, prompt ONCE for a different vmbrN and
+# re-classify. Sets _pve_bridge_create_needed. A still-conflicting choice fails
+# with guidance rather than looping (recursion with a mutating `when` is a trap).
 
 - name: "net | list existing bridges on {{ proxmox_node }}"
   ansible.builtin.uri:
@@ -15,31 +13,12 @@
   register: net_bridges
   no_log: true
 
-- name: "net | classify the current bridge name"
+- name: "net | classify '{{ proxmox_lab_bridge }}'"
   ansible.builtin.set_fact:
-    _existing_bridges: "{{ net_bridges.json.data | map(attribute='iface') | list }}"
-    # The existing interface entry for this name (if any), to read its comment.
-    _bridge_entry: "{{ net_bridges.json.data | selectattr('iface', 'equalto', proxmox_lab_bridge) | list | first | default({}) }}"
+    _bridge_present: "{{ proxmox_lab_bridge in (net_bridges.json.data | map(attribute='iface') | list) }}"
+    _bridge_is_ours: "{{ lab_bridge_comment in (net_bridges.json.data | selectattr('iface', 'equalto', proxmox_lab_bridge) | map(attribute='comments') | list | first | default('')) }}"
 
-- name: "net | is this an existing bridge, and is it ours?"
-  ansible.builtin.set_fact:
-    _bridge_present: "{{ proxmox_lab_bridge in _existing_bridges }}"
-    _bridge_is_ours: "{{ lab_bridge_comment in (_bridge_entry.comments | default('')) }}"
-
-# Case 1 — free name: create it.
-- name: "net | '{{ proxmox_lab_bridge }}' is free — will create it"
-  ansible.builtin.set_fact:
-    _pve_bridge_create_needed: true
-  when: not _bridge_present
-
-# Case 2 — present and ours: reuse, no create, no prompt.
-- name: "net | reuse the existing danderspritz-lab bridge '{{ proxmox_lab_bridge }}'"
-  ansible.builtin.set_fact:
-    _pve_bridge_create_needed: false
-  when: _bridge_present and _bridge_is_ours
-
-# Case 3 — present but NOT ours: refuse to touch it; ask for another name.
-- name: "net | '{{ proxmox_lab_bridge }}' exists and is not ours — ask for a different name"
+- name: "net | '{{ proxmox_lab_bridge }}' is a foreign bridge — choose a different name"
   when: _bridge_present and not _bridge_is_ours
   block:
     - name: "net | prompt for an unused bridge name"
@@ -48,7 +27,7 @@
 
           Bridge '{{ proxmox_lab_bridge }}' already exists on {{ proxmox_node }}, is not one this
           lab created (no '{{ lab_bridge_comment }}' comment), and will NOT be reused or modified.
-          Existing bridges: {{ _existing_bridges | join(', ') }}
+          Existing bridges: {{ net_bridges.json.data | map(attribute='iface') | join(', ') }}
           Enter a DIFFERENT, unused Proxmox bridge name (must be vmbrN, e.g. vmbr41)
       register: _bridge_prompt
 
@@ -56,6 +35,31 @@
       ansible.builtin.set_fact:
         proxmox_lab_bridge: "{{ _bridge_prompt.user_input | trim }}"
 
-    # Re-check the new name (which may also be taken, ours, or malformed).
-    - name: "net | re-check the new name"
-      ansible.builtin.include_tasks: resolve_bridge_name.yml
+    - name: "net | re-list bridges for the new name"
+      ansible.builtin.uri:
+        url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/network?type=any_bridge"
+        method: GET
+        headers: "{{ _pve_get_headers }}"
+        validate_certs: "{{ proxmox_validate_certs }}"
+      register: net_bridges2
+      no_log: true
+
+    - name: "net | re-classify the new name"
+      ansible.builtin.set_fact:
+        _bridge_present: "{{ proxmox_lab_bridge in (net_bridges2.json.data | map(attribute='iface') | list) }}"
+        _bridge_is_ours: "{{ lab_bridge_comment in (net_bridges2.json.data | selectattr('iface', 'equalto', proxmox_lab_bridge) | map(attribute='comments') | list | first | default('')) }}"
+
+- name: "net | the chosen bridge must be free or ours"
+  ansible.builtin.assert:
+    that:
+      - not (_bridge_present and not _bridge_is_ours)
+    fail_msg: >-
+      '{{ proxmox_lab_bridge }}' is in use by another bridge on {{ proxmox_node }}.
+      Re-run and choose a free vmbrN, or set proxmox_lab_bridge.
+    quiet: true
+
+- name: "net | decide whether the bridge needs creating"
+  ansible.builtin.set_fact:
+    # Create only when it does not already exist; an existing-and-ours bridge is
+    # reused as-is.
+    _pve_bridge_create_needed: "{{ not _bridge_present }}"
