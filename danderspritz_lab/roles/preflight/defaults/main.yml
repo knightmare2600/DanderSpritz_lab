@@ -1,0 +1,9 @@
+---
+# Confirm the required ISOs exist in Proxmox storage with the exact names.
+preflight_check_isos: true
+
+# Also SHA-256 the ISOs against lab_vms[].iso_sha256. Only runs when Ansible is
+# on the PVE node (needs `pvesm` + readable files); skipped with a note
+# otherwise. Reads multi-GB files, so it adds a few minutes — disable for a fast
+# run with: -e preflight_verify_sha256=false
+preflight_verify_sha256: true

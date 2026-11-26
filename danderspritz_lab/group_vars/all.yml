@@ -74,6 +74,7 @@ lab_vms:
   - name: dc
     vmid: 940
     iso: "7601.17514.101119-1850_x64fre_server_eval_en-us-GRMSXEVAL_EN_DVD.iso"
+    iso_sha256: "30832ad76ccfa4ce48ccb936edefe02079d42fb1da32201bf9e3a880c8ed6312"
     answer_file: "2008_r2/Autounattend.xml"
     os_short: "2k8R2"
     ostype: "win7"           # Proxmox qm ostype (no w2008r2 key; win7 era)
@@ -86,6 +87,7 @@ lab_vms:
   - name: target
     vmid: 941
     iso: "7600.16385.090713-1255_x64fre_enterprise_en-us_EVAL_Eval_Enterprise-GRMCENXEVAL_EN_DVD.iso"
+    iso_sha256: "2c16c73388a5c02a0ec4cd8b9e5c14ba28b7b45d13d0c9c7d44459feecc0385f"
     answer_file: "7/Autounattend.xml"
     os_short: "w7"
     ostype: "win7"
@@ -98,6 +100,7 @@ lab_vms:
   - name: danderspritz
     vmid: 942
     iso: "10240.16384.150709-1700.TH1_CLIENTENTERPRISEEVAL_OEMRET_X64FRE_EN-US.ISO"
+    iso_sha256: "9b53e1f6ab6259a05d0e8f42db5baad50b57da34da9312783f7e8bd4ae2cd3ca"
     answer_file: "10/Autounattend.xml"
     os_short: "w10"
     ostype: "win10"

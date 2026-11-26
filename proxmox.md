@@ -70,6 +70,15 @@ A single matching hash is enough to trust the file; the full MD5/SHA-1/SHA-256
 set for all three ISOs is in the top-level [`README.md`](README.md) if you want
 to check more than one.
 
+You do not have to do this check entirely by hand: `build.yml` runs a
+**preflight** before creating anything. It asks the Proxmox API whether each
+required ISO is present under the exact name (catching a missing file or an
+upper/lower-case slip and telling you which variant it found), and — when
+Ansible is running on the PVE node — SHA-256s each one against the pinned value.
+A wrong name or hash stops the run immediately instead of part-way through a
+long build. The hashing reads multi-GB files, so skip it for a fast run with
+`-e preflight_verify_sha256=false`.
+
 ## 3. API token
 
 GUI → Datacenter → Permissions → API Tokens → add `root@pam`, token id

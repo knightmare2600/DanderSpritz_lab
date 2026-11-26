@@ -1,0 +1,94 @@
+---
+# Preflight checks for the selected VMs, run on the control node before any VM
+# is created. Fails early and loudly on the things that otherwise waste a long
+# build: a missing ISO, a case/spelling mismatch in the filename, or the wrong
+# ISO entirely (SHA-256).
+#
+# Expects (from the build.yml play): _selected_vms, and the proxmox_* vars incl.
+# proxmox_api_token_secret from vault.
+
+- name: "preflight | list ISO volumes in storage '{{ proxmox_iso_storage }}'"
+  ansible.builtin.uri:
+    url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/storage/{{ proxmox_iso_storage }}/content?content=iso"
+    method: GET
+    headers:
+      Authorization: "PVEAPIToken={{ proxmox_api_user }}!{{ proxmox_api_token_id }}={{ proxmox_api_token_secret }}"
+    validate_certs: "{{ proxmox_validate_certs }}"
+    return_content: true
+  register: pf_iso_list
+  no_log: true          # response is fine, but the Authorization header is not
+  when: preflight_check_isos | bool
+
+- name: "preflight | work out what is present vs required"
+  ansible.builtin.set_fact:
+    # Strip the "storage:iso/" prefix down to the bare filename.
+    pf_present: "{{ pf_iso_list.json.data | map(attribute='volid') | map('regex_replace', '^.*/', '') | list }}"
+    pf_required: "{{ (_selected_vms | map(attribute='iso') | list) + [proxmox_virtio_iso] }}"
+  when: preflight_check_isos | bool
+
+- name: "preflight | every required ISO is present with the exact name"
+  ansible.builtin.assert:
+    that:
+      - item in pf_present
+    fail_msg: >-
+      '{{ item }}' was not found with that exact name in storage
+      '{{ proxmox_iso_storage }}'.
+      {{ ('A case/spelling variant IS present: '
+            + (pf_present | select('match', '(?i)^' + (item | regex_escape) + '$') | list | join(', '))
+            + ' — rename it on the node to match exactly.')
+         if (item | lower) in (pf_present | map('lower') | list)
+         else ('Present ISOs: ' + (pf_present | join(', ') if (pf_present | length > 0) else '(none)')) }}
+    success_msg: "{{ item }} — present"
+    quiet: true
+  loop: "{{ pf_required }}"
+  when: preflight_check_isos | bool
+
+# --- SHA-256 (only possible when Ansible is on the PVE node) ----------------
+- name: "preflight | is pvesm available (i.e. are we on the PVE node)?"
+  ansible.builtin.command: which pvesm
+  register: pf_pvesm
+  changed_when: false
+  failed_when: false
+  when: preflight_verify_sha256 | bool
+
+- name: "preflight | SHA-256 verify the Windows ISOs"
+  when:
+    - preflight_verify_sha256 | bool
+    - pf_pvesm.rc | default(1) == 0
+  block:
+    - name: "preflight | compute SHA-256 of each ISO on the node"
+      ansible.builtin.shell: >-
+        set -o pipefail;
+        sha256sum "$(pvesm path {{ proxmox_iso_storage }}:iso/{{ item.iso }})" | awk '{ print $1 }'
+      args:
+        executable: /bin/bash
+      changed_when: false
+      register: pf_sha
+      loop: "{{ _selected_vms | selectattr('iso_sha256', 'defined') | list }}"
+      loop_control:
+        label: "{{ item.iso }}"
+
+    - name: "preflight | computed SHA-256 matches the expected value"
+      ansible.builtin.assert:
+        that:
+          - (item.stdout | trim) == item.item.iso_sha256
+        fail_msg: >-
+          SHA-256 mismatch for {{ item.item.iso }} — this is the wrong or a
+          corrupt ISO. Storage file: {{ item.stdout | trim }}.
+          Expected: {{ item.item.iso_sha256 }}.
+        success_msg: "{{ item.item.iso }} — SHA-256 OK"
+        quiet: true
+      loop: "{{ pf_sha.results }}"
+      loop_control:
+        label: "{{ item.item.iso }}"
+
+- name: "preflight | note that SHA-256 verification was skipped"
+  ansible.builtin.debug:
+    msg: >-
+      SHA-256 check skipped: `pvesm` not found, so Ansible is not running on the
+      PVE node (or the ISO storage is not file-based). ISO presence and naming
+      were still verified via the API; verify the hashes by hand with the
+      commands in README.md if you want belt-and-braces.
+  when:
+    - preflight_verify_sha256 | bool
+    - pf_pvesm.rc | default(1) != 0

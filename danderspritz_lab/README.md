@@ -64,6 +64,11 @@ ansible-playbook configure.yml --ask-vault-pass --limit target
 Build is idempotent: a VM whose `vmid` already exists is left alone. To rebuild,
 destroy it in Proxmox first.
 
+`build.yml` runs a **preflight** first (`roles/preflight`): it checks via the
+Proxmox API that each required ISO is present with the exact name (catching
+case/spelling slips) and, when run on the PVE node, SHA-256s them against
+`lab_vms[].iso_sha256`. Disable the hashing with `-e preflight_verify_sha256=false`.
+
 **Build a subset** with `lab_vm_filter` (default `all`) — a comma-separated list
 of `lab_vms` names, no file editing:
 

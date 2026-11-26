@@ -38,6 +38,10 @@
       ansible.builtin.debug:
         msg: "Building: {{ _selected_vms | map(attribute='name') | list }}"
 
+    - name: "Preflight: ISOs present, correctly named, and (on-node) SHA-256 correct"
+      ansible.builtin.include_role:
+        name: preflight
+
     - name: Provision each selected lab VM
       ansible.builtin.include_role:
         name: proxmox_vm
