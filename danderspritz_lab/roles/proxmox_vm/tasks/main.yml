@@ -88,6 +88,13 @@
 
         # The DanderSpritz toolset is too big for the repo: download it once
         # (cached) on the control node and bake it onto the same CD.
+        - name: "{{ vm.name }} | ensure the download cache dir exists"
+          ansible.builtin.file:
+            path: "{{ eqgrp_cache_dir }}"
+            state: directory
+            mode: "0755"
+          when: vm.fetch_eqgrp | default(false)
+
         - name: "{{ vm.name }} | download the DanderSpritz toolset (cached)"
           ansible.builtin.get_url:
             url: "{{ eqgrp_url }}"
