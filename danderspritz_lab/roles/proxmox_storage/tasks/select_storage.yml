@@ -2,14 +2,22 @@
 # Recursive. Operates on the facts _sel_kind, _sel_candidates, _sel_current and
 # sets _sel_result to a storage that IS in _sel_candidates — prompting (with the
 # first candidate as the default) until the current value is valid.
+#
+# The prompt block is gated on _sel_ok, a fact computed once at THIS level, not
+# on _sel_current directly: the block mutates _sel_current, and a block-level
+# `when` referencing it would flip mid-block and skip the recursive re-check.
+
+- name: "storage | is '{{ _sel_current }}' a valid {{ _sel_kind }} storage?"
+  ansible.builtin.set_fact:
+    _sel_ok: "{{ _sel_current in _sel_candidates }}"
 
 - name: "storage | '{{ _sel_current }}' is a valid {{ _sel_kind }} storage"
   ansible.builtin.set_fact:
     _sel_result: "{{ _sel_current }}"
-  when: _sel_current in _sel_candidates
+  when: _sel_ok | bool
 
 - name: "storage | '{{ _sel_current }}' is not {{ _sel_kind }}-capable — choose one"
-  when: _sel_current not in _sel_candidates
+  when: not (_sel_ok | bool)
   block:
     - name: "storage | prompt for a {{ _sel_kind }} storage"
       ansible.builtin.pause:
