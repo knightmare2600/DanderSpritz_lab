@@ -218,9 +218,9 @@
           # virtio-win drivers, lettered in WinPE (see virtio_winpe_drives).
           sata0: "{{ proxmox_iso_storage }}:iso/{{ proxmox_virtio_iso }},media=cdrom"
         net:
-          # In 'tagged' mode the NIC carries VLAN lab_vlan (a BYO firewall VM on
-          # that VLAN is the gateway); otherwise it is an untagged access port.
-          net0: "virtio,bridge={{ proxmox_lab_bridge }}{{ (',tag=' ~ lab_vlan) if (lab_network_mode == 'tagged' and (lab_vlan | string | length > 0)) else '' }}"
+          # Fixed MAC (so the gateway's DHCP can reserve the right IP in routed
+          # mode). In 'tagged' mode the NIC also carries VLAN lab_vlan.
+          net0: "virtio,bridge={{ proxmox_lab_bridge }}{{ (',macaddr=' ~ vm.mac) if (vm.mac is defined) else '' }}{{ (',tag=' ~ lab_vlan) if (lab_network_mode == 'tagged' and (lab_vlan | string | length > 0)) else '' }}"
         # Disk first: empty disk falls through to CD for the install, then boots
         # the installed bootloader on every reboot - no install loop, no CD eject.
         boot: "order=scsi0;ide2"

@@ -25,6 +25,13 @@ bind-interfaces
 dhcp-range={{ lab_dhcp_range_start }},{{ lab_dhcp_range_end }},12h
 dhcp-option=3,{{ lab_gateway }}
 dhcp-option=6,{{ lab_gateway }}
+# Reservations for the lab's known hosts (by MAC) so they get their documented
+# addresses (.2/.3/.4) rather than a pool lease — no in-guest static config.
+{% for v in lab_vms | default([]) %}
+{% if v.mac is defined %}
+dhcp-host={{ v.mac }},{{ v.ip }}
+{% endif %}
+{% endfor %}
 EOF
 systemctl enable dnsmasq
 systemctl restart dnsmasq

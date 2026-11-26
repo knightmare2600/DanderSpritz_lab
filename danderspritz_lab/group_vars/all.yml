@@ -159,6 +159,7 @@ lab_vms:
     cores: 2
     disk_gb: 40
     ip: "{{ lab_dc_ip }}"
+    mac: "02:00:00:40:00:02"
     computer_name: "dc"
 
   - name: target
@@ -172,6 +173,7 @@ lab_vms:
     cores: 2
     disk_gb: 40
     ip: "{{ lab_target_ip }}"
+    mac: "02:00:00:40:00:03"
     computer_name: "target"
 
   - name: danderspritz
@@ -185,6 +187,7 @@ lab_vms:
     cores: 2
     disk_gb: 60
     ip: "{{ lab_dsz_ip }}"
+    mac: "02:00:00:40:00:04"
     computer_name: "danderspritz10"
     tools_iso: true          # attach the vendored-installers CD (danderspritz_tools)
     fetch_eqgrp: true         # download the DanderSpritz toolset and add it to that CD

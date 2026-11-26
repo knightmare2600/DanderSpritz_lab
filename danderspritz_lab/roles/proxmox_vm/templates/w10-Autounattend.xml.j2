@@ -273,12 +273,14 @@
                 <!--
 -->
                 <!-- END WITH WINDOWS UPDATES -->
+{% if (lab_network_mode | default('managed')) != 'routed' %}
                             <SynchronousCommand wcm:action="add">
                     <CommandLine>cmd.exe /c powershell -NoProfile -Command "for($i=0;$i -lt 30;$i++){$c=Get-WmiObject Win32_NetworkAdapterConfiguration -Filter 'IPEnabled=TRUE' | Select-Object -First 1; if($c){$r=$c.EnableStatic('{{ vm.ip }}','255.255.255.0'); if($r.ReturnValue -eq 0 -or $r.ReturnValue -eq 1){$c.SetGateways('{{ lab_gateway }}') | Out-Null; $c.SetDNSServerSearchOrder(@('{{ lab_dns_upstream[0] }}','{{ lab_dns_upstream[1] }}')) | Out-Null; break}}; Start-Sleep -Seconds 5}"</CommandLine>
                     <Description>Set static lab IP so Ansible can reach the guest</Description>
                     <Order>30</Order>
                     <RequiresUserInput>true</RequiresUserInput>
                 </SynchronousCommand>
+{% endif %}
 </FirstLogonCommands>
             <ShowWindowsLive>false</ShowWindowsLive>
         </component>

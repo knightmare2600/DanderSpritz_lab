@@ -65,8 +65,13 @@ Set `lab_network_mode: routed`. The playbook stands up a tiny Debian **LXC** tha
 DHCP), LAN leg on the isolated lab bridge, running `dnsmasq` (DHCP
 `lab_dhcp_range_start`–`end`, default `.100`–`.150`, + DNS) and `nftables`
 masquerade. Isolated **and** internet-connected, with **no host NAT** and nothing
-for you to hand-build. The lab's static hosts (`.2/.3/.4`) sit outside the DHCP
-pool and route out through it.
+for you to hand-build.
+
+In this mode the lab hosts get their documented addresses by **DHCP reservation**
+(each VM has a fixed `mac` in `lab_vms`; the gateway's dnsmasq maps MAC → `.2/.3/.4`,
+outside the pool) rather than the in-guest static-IP command, which is skipped —
+far more reliable than configuring static IPs inside Windows at first boot. Extra
+hosts dropped on the lab net get a `.100–150` lease.
 
 This is the only mode that needs **root SSH from the control node to the PVE
 node** — `gateway.yml` runs there (`pct`/`pveam`/`pvesh`) to create the bridge,
