@@ -108,13 +108,28 @@
   register: qemu_ga_msi
   changed_when: false
 
-- name: "Install qemu guest agent"
+- name: "Install qemu guest agent (optional; best-effort)"
   ansible.windows.win_package:
     path: "{{ qemu_ga_msi.stdout | trim }}"
     state: present
   when: (qemu_ga_msi.stdout | trim) | length > 0
+  register: qemu_ga_install
+  failed_when: false
 
-- name: "Ensure the QEMU-GA service is running"
+- name: "Note if the guest agent did not install"
+  ansible.builtin.debug:
+    msg: >-
+      qemu guest agent did not install cleanly (rc
+      {{ qemu_ga_install.rc | default('n/a') }}). NON-FATAL: the agent is only a
+      Proxmox convenience (guest IP in the GUI, graceful shutdown) and is not
+      needed by WinRM, the domain, or the exploit chain. The newest virtio-win
+      qemu-ga service will not start on 2008 R2 / Win7 (needs a newer OS); use an
+      older virtio-win build by hand if you want the agent on those guests.
+  when:
+    - qemu_ga_install is defined
+    - (qemu_ga_install.rc | default(0)) != 0
+
+- name: "Ensure the QEMU-GA service is running (if the agent installed)"
   ansible.windows.win_service:
     name: QEMU-GA
     state: started
