@@ -63,7 +63,7 @@
     dest: 'C:\Windows\Temp\KB976932-X64.exe'
     checksum: "{{ sp1_sha256 }}"
     checksum_algorithm: sha256
-    timeout: 120
+    timeout: 600
   when: not _sp1_staged.stat.exists
 
 - name: "Target | verify the SP1 installer SHA-256 (CD or download)"
