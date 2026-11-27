@@ -30,6 +30,22 @@ danderspritz_tools: &dsz_tools
     dest: 'C:\Windows\Temp\pywin32-py2.6.exe'
     sha256: "82b62e100802db25607829b259fc9a61289761a0536e25075ca189b94949ac7c"
 
+# PowerShell 5.1 bootstrap for the COLD 2008 R2 / Win7 boxes. Modern
+# ansible.windows modules require PS 5.1, but those OSes ship PS 2.0 and a cold
+# PS 2.0 box cannot TLS-download installers (no TLS 1.2). So .NET 4.5.2 then WMF
+# 5.1 are vendored in tools/ and installed from the tools CD AT FIRST LOGON (see
+# the 2k8R2/w7 answer files), so the box presents PS 5.1 the first time Ansible
+# connects. Order matters: WMF 5.1 requires .NET 4.5.2 already present.
+# WMF 5.1 downloads as Win7AndW2K8R2-KB3191566-x64.zip — extract the .msu into
+# tools/ with exactly this name. Both are gitignored (too big for the repo).
+windows_bootstrap_tools: &bootstrap_tools
+  - src: "NDP452-KB2901907-x86-x64-AllOS-ENU.exe"
+    dest: 'C:\Windows\Temp\NDP452.exe'
+    sha256: "6c2c589132e830a185c5f40f82042bee3022e721a216680bd9b3995ba86f3781"
+  - src: "Win7AndW2K8R2-KB3191566-x64.msu"
+    dest: 'C:\Windows\Temp\WMF51.msu'
+    sha256: ""   # set to the SHA-256 of your downloaded .msu to enforce verification
+
 # DanderSpritz/FuzzBunch toolset. ~200 MB zipped — too big for the repo or LFS,
 # so build.yml downloads it once on the control node and bakes it onto the tools
 # CD; the guest expands it from the CD instead of git-cloning (no git/internet
@@ -186,6 +202,8 @@ lab_vms:
     ip: "{{ lab_dc_ip }}"
     mac: "02:00:00:40:00:02"
     computer_name: "dc"
+    tools_iso: true             # CD carrying the PS 5.1 bootstrap installers
+    vendored_tools: *bootstrap_tools  # .NET 4.5.2 + WMF 5.1, installed at first logon
 
   - name: target
     vmid: 941
@@ -200,7 +218,8 @@ lab_vms:
     ip: "{{ lab_target_ip }}"
     mac: "02:00:00:40:00:03"
     computer_name: "target"
-    tools_iso: true          # attach a tools CD (carries Win7 SP1)
+    tools_iso: true          # attach a tools CD (carries the PS 5.1 bootstrap + Win7 SP1)
+    vendored_tools: *bootstrap_tools  # .NET 4.5.2 + WMF 5.1, installed at first logon
     fetch_sp1: true          # put Win7 SP1 (KB976932) on that CD at build time
 
   - name: danderspritz

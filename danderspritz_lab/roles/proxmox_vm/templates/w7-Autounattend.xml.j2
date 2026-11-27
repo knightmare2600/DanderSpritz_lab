@@ -267,6 +267,30 @@
                     <Order>24</Order>
                     <RequiresUserInput>true</RequiresUserInput>
                 </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <!-- PS 5.1 bootstrap 1/3: install .NET 4.5.2 from the tools CD
+                         (WMF 5.1 requires it present first). PS 2.0 compatible. -->
+                    <CommandLine>cmd.exe /c powershell -Command "$f=Get-PSDrive -PSProvider FileSystem | ForEach-Object { Join-Path $_.Root 'NDP452-KB2901907-x86-x64-AllOS-ENU.exe' } | Where-Object { Test-Path $_ } | Select-Object -First 1; if($f){ Start-Process -FilePath $f -ArgumentList '/q','/norestart' -Wait }"</CommandLine>
+                    <Description>Install .NET 4.5.2 (PS5.1 prereq)</Description>
+                    <Order>25</Order>
+                    <RequiresUserInput>true</RequiresUserInput>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <!-- PS 5.1 bootstrap 2/3: install WMF 5.1 (PowerShell 5.1)
+                         from the tools CD via wusa. PS 2.0 compatible. -->
+                    <CommandLine>cmd.exe /c powershell -Command "$f=Get-PSDrive -PSProvider FileSystem | ForEach-Object { Join-Path $_.Root 'Win7AndW2K8R2-KB3191566-x64.msu' } | Where-Object { Test-Path $_ } | Select-Object -First 1; if($f){ Start-Process -FilePath 'wusa.exe' -ArgumentList $f,'/quiet','/norestart' -Wait }"</CommandLine>
+                    <Description>Install WMF 5.1 / PowerShell 5.1</Description>
+                    <Order>26</Order>
+                    <RequiresUserInput>true</RequiresUserInput>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <!-- PS 5.1 bootstrap 3/3: reboot to activate .NET + WMF. After
+                         this boot the box runs PS 5.1 and Ansible can manage it. -->
+                    <CommandLine>cmd.exe /c shutdown /r /t 90 /c "Rebooting to activate PowerShell 5.1"</CommandLine>
+                    <Description>Reboot to activate PowerShell 5.1</Description>
+                    <Order>27</Order>
+                    <RequiresUserInput>true</RequiresUserInput>
+                </SynchronousCommand>
                 <!-- WITHOUT WINDOWS UPDATES -->
 <!-- END WITHOUT WINDOWS UPDATES -->
                 <!-- WITH WINDOWS UPDATES -->

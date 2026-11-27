@@ -50,6 +50,18 @@ Downloaded at build time and baked onto the tools CD (not in the repo — ~200 M
 |----------|-----------|--------|----------|
 | `windows6.1-KB976932-X64.exe` | Windows 7 **SP1** (~903 MB / 947,070,088 bytes; saved on the guest as `KB976932-X64.exe`; SHA-256 `f4d1d418…aa64c8`) | A dedicated **Internet Archive item** (`sp1_url`) whose archive-computed MD5+size match the published installer — **Microsoft removed the original** (do not use a Wayback `id_` capture; those truncate large files) | **Fetched onto the target's tools CD** (`fetch_sp1: true`): a copy vendored in `tools/` is preferred, else `build.yml` downloads it (SHA-256-verified via `sp1_sha256`). On an already-built target with no CD, the target role downloads it on the guest instead (also SHA-256-verified). Override `sp1_url` with a LAN HTTP URL to serve a vendored copy from the control node and avoid the pull over the lab NAT. `Install-SP1.ps1` only runs the staged, verified file. |
 
+## PowerShell 5.1 bootstrap — cold 2008 R2 (DC) and Win7 (target)
+
+These boxes ship **PowerShell 2.0**; modern `ansible.windows` modules require
+**5.1**, and a cold PS 2.0 box can't TLS-download installers. So both are
+vendored in `tools/` and installed **at first logon** from each box's tools CD
+(answer-file orders 25–27), before Ansible connects. Both are gitignored (large).
+
+| Filename | What it is | Source | Decision |
+|----------|-----------|--------|----------|
+| `NDP452-KB2901907-x86-x64-AllOS-ENU.exe` | .NET Framework **4.5.2** (~69 MB; SHA-256 `6c2c5891…a86f3781`) — WMF 5.1 prerequisite | Microsoft Download Center (id=42642) / web archive | Vendored on the DC+target CD; installed `/q /norestart` at first logon. SHA-256 verified by preflight. |
+| `Win7AndW2K8R2-KB3191566-x64.msu` | **WMF 5.1 / PowerShell 5.1** (~80 MB) — extract from `...-x64.zip` | Microsoft Download Center (id=54616) / Legacy Update | Vendored on the DC+target CD; installed `wusa /quiet /norestart`, then a reboot activates PS 5.1. Set `sha256` in `windows_bootstrap_tools` to enforce verification. |
+
 ## Domain controller (Server 2008 R2)
 
 | Filename | What it is | Current source | Risk |

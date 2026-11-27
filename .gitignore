@@ -11,3 +11,8 @@ tools/pywin32-221.win-amd64-py2.6.exe
 # Windows 7 SP1 installer (~903 MB) - vendored/fetched locally onto the target
 # tools CD, never committed (exceeds GitHub's 100 MB file limit)
 tools/windows6.1-KB976932-X64.exe
+
+# PS 5.1 bootstrap installers for cold 2008 R2 / Win7 (vendored locally, large) -
+# .NET 4.5.2 (~69 MB) and WMF 5.1 (~80 MB). Never committed.
+tools/NDP452-KB2901907-x86-x64-AllOS-ENU.exe
+tools/Win7AndW2K8R2-KB3191566-x64.msu

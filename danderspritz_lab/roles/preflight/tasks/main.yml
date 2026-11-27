@@ -116,14 +116,16 @@
       ansible.builtin.assert:
         that:
           - item.stat.exists
-          - item.stat.checksum == item.item.sha256
+          - (item.item.sha256 | length == 0) or (item.stat.checksum == item.item.sha256)
         fail_msg: >-
           {{ tools_dir }}/{{ item.item.src }}:
           {{ 'missing from the tools/ dir'
              if not item.stat.exists
              else ('SHA-256 ' + item.stat.checksum + ' does not match expected '
                    + item.item.sha256 + ' (wrong or corrupt file)') }}
-        success_msg: "{{ item.item.src }} — present, SHA-256 OK"
+        success_msg: >-
+          {{ item.item.src }} — present{{ ', SHA-256 OK' if (item.item.sha256 | length > 0)
+             else ' (SHA-256 unset in group_vars — existence only, NOT verified)' }}
         quiet: true
       loop: "{{ pf_tools.results }}"
       loop_control:
