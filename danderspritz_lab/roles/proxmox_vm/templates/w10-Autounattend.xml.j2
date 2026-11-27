@@ -154,7 +154,18 @@
                     <Order>3</Order>
                     <RequiresUserInput>true</RequiresUserInput>
                 </SynchronousCommand>
-<SynchronousCommand wcm:action="add">
+                <SynchronousCommand wcm:action="add">
+                    <!-- On Win10 a Public network profile makes `winrm quickconfig`
+                         refuse to create the HTTP listener, so 5985 never opens.
+                         Force every connection profile to Private first. The loop
+                         waits up to 60s for NLA to classify the NIC before setting
+                         it, so this works on a cold first logon. -->
+                    <CommandLine>cmd.exe /c powershell -Command "for($i=0;$i -lt 12;$i++){ $p=Get-NetConnectionProfile; if($p){ $p | Set-NetConnectionProfile -NetworkCategory Private; break }; Start-Sleep -Seconds 5 }"</CommandLine>
+                    <Description>Set network profile to Private (so winrm quickconfig works)</Description>
+                    <Order>4</Order>
+                    <RequiresUserInput>true</RequiresUserInput>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
                     <CommandLine>cmd.exe /c winrm quickconfig -q</CommandLine>
                     <Description>winrm quickconfig -q</Description>
                     <Order>5</Order>

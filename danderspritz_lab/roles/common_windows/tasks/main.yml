@@ -3,10 +3,97 @@
 # vm-guest-tools.bat -> qemu-guest-agent, enable-rdp.bat, Install-Chocolatey.ps1.
 # (vagrant-ssh.bat is dropped - Ansible uses WinRM.)
 
-- name: "Stage the repo scripts/ tree on the guest"
+# --- Self-heal WinRM reachability ------------------------------------------
+# Runs first, every configure pass. Guards against a reboot re-classifying the
+# NIC as Public (which blocks WinRM on Win10/2012+) and against firewall /
+# listener / service drift. Idempotent and safe on Win7 / 2008 R2, where
+# Set-NetConnectionProfile does not exist (the guard skips it there).
+# NOTE: this corrects drift on a reachable box; it cannot bootstrap a guest
+# whose WinRM is already down. First-contact is handled in the answer files.
+- name: "Re-assert WinRM reachability (profile, firewall, listener, service)"
+  ansible.windows.win_shell: |
+    if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) {
+      Get-NetConnectionProfile |
+        Where-Object { $_.NetworkCategory -eq 'Public' } |
+        Set-NetConnectionProfile -NetworkCategory Private -ErrorAction SilentlyContinue
+    }
+    netsh advfirewall firewall show rule name="WinRM-HTTP-5985" | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+      netsh advfirewall firewall add rule name="WinRM-HTTP-5985" dir=in action=allow protocol=TCP localport=5985 profile=any | Out-Null
+    }
+    $listeners = winrm enumerate winrm/config/listener 2>$null
+    if ($listeners -notmatch 'Transport\s*=\s*HTTP') {
+      winrm create winrm/config/Listener?Address=*+Transport=HTTP '@{Port="5985"}' | Out-Null
+    }
+    Set-Service -Name WinRM -StartupType Automatic
+    Start-Service -Name WinRM -ErrorAction SilentlyContinue
+  changed_when: false
+  failed_when: false
+
+# --- Stage the repo scripts/ tree ------------------------------------------
+# win_copy of the whole tree (121 files) over WinRM is pathologically slow and
+# can appear to hang for hours — each file is a separate base64 round-trip.
+# Instead: zip once on the control node, push the single archive, expand it on
+# the guest with win_unzip (version-proof: it falls back to the Shell COM
+# object on PowerShell 2.0 / Win7 / 2008 R2, which have no Expand-Archive),
+# then normalise into the stage dir with robocopy (built in on every target OS)
+# so the layout matches the old win_copy regardless of how the zip nests.
+- name: "Create a temp zip of scripts/ on the control node"
+  ansible.builtin.tempfile:
+    state: file
+    suffix: ".zip"
+  register: _scripts_zip
+  delegate_to: localhost
+  run_once: true
+
+- name: "Archive scripts/ into that single zip"
+  community.general.archive:
+    path: "{{ windows_scripts_dir }}/"
+    dest: "{{ _scripts_zip.path }}"
+    format: zip
+    force_archive: true
+  delegate_to: localhost
+  run_once: true
+
+- name: "Push the single zip to the guest"
   ansible.windows.win_copy:
-    src: "{{ windows_scripts_dir }}/"
-    dest: "{{ guest_stage_dir }}\\scripts\\"
+    src: "{{ _scripts_zip.path }}"
+    dest: 'C:\Windows\Temp\scripts-stage.zip'
+
+- name: "Clear any previous extraction temp on the guest"
+  ansible.windows.win_file:
+    path: 'C:\Windows\Temp\scripts-stage'
+    state: absent
+
+- name: "Expand the zip on the guest (version-proof)"
+  community.windows.win_unzip:
+    src: 'C:\Windows\Temp\scripts-stage.zip'
+    dest: 'C:\Windows\Temp\scripts-stage'
+    delete_archive: true
+
+- name: "Normalise the extracted tree into the stage dir"
+  ansible.windows.win_shell: |
+    $src = 'C:\Windows\Temp\scripts-stage'
+    if (Test-Path (Join-Path $src 'scripts')) { $src = Join-Path $src 'scripts' }
+    $dest = '{{ guest_stage_dir }}\scripts'
+    New-Item -ItemType Directory -Path $dest -Force | Out-Null
+    robocopy "$src" "$dest" /E /NFL /NDL /NJH /NJS /NP | Out-Null
+    # robocopy uses exit codes 0-7 for success; 8+ is a real failure.
+    if ($LASTEXITCODE -ge 8) { exit $LASTEXITCODE } else { exit 0 }
+  changed_when: true
+
+- name: "Verify a known script landed in the stage dir"
+  ansible.windows.win_stat:
+    path: '{{ guest_stage_dir }}\scripts\Install-Chocolatey.ps1'
+  register: _scripts_check
+  failed_when: not _scripts_check.stat.exists
+
+- name: "Remove the control-node temp zip"
+  ansible.builtin.file:
+    path: "{{ _scripts_zip.path }}"
+    state: absent
+  delegate_to: localhost
+  run_once: true
 
 # --- Proxmox guest agent (was VirtualBox guest additions) -------------------
 # The qemu-ga MSI ships on the virtio-win ISO. If that ISO is still attached it

@@ -5,6 +5,32 @@
 # Order matters: common prep on all hosts, then the DC must be fully promoted
 # before the Target can join the domain.
 
+- name: Control-node prerequisites
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    # Ansible's WinRM connection plugin needs the python 'winrm' module
+    # (pywinrm) on the CONTROL node. Without it every Windows task fails with a
+    # confusing connection error, so check it once here and fail loudly.
+    - name: "Is pywinrm importable by this Ansible interpreter?"
+      ansible.builtin.command: "{{ ansible_playbook_python }} -c \"import winrm\""
+      changed_when: false
+      failed_when: false
+      register: _pywinrm_check
+
+    - name: "pywinrm must be installed on the control node"
+      ansible.builtin.assert:
+        that:
+          - _pywinrm_check.rc == 0
+        fail_msg: >-
+          The python 'winrm' module (pywinrm) is not available to this Ansible
+          (interpreter: {{ ansible_playbook_python }}). The WinRM connection
+          cannot work without it. Install it on the CONTROL node, e.g.
+          `sudo apt install python3-winrm` (Debian/Ubuntu) or
+          `pip install pywinrm`, then re-run.
+        success_msg: "pywinrm present"
+        quiet: true
+
 - name: Common Windows preparation (all guests)
   hosts: windows
   gather_facts: false

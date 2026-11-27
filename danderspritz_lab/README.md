@@ -39,8 +39,13 @@ once.
 3. **Proxmox API token.** Datacenter → Permissions → API Tokens. Put the secret
    in `group_vars/vault.yml` (copy `vault.yml.example`, then
    `ansible-vault encrypt group_vars/vault.yml`).
-4. On the control node: `genisoimage` (for building the answer-file ISO) and the
-   Ansible collections: `ansible-galaxy collection install -r requirements.yml`.
+4. On the control node:
+   - `genisoimage` (for building the answer-file ISO).
+   - The Ansible collections: `ansible-galaxy collection install -r requirements.yml`.
+   - **pywinrm** — the python `winrm` module, needed by Ansible's WinRM
+     connection to configure the guests: `sudo apt install python3-winrm`
+     (Debian/Ubuntu) or `pip install pywinrm`. `configure.yml` checks for it up
+     front and fails with this instruction if it is missing.
 
 Set the real `proxmox_api_host`, `proxmox_node`, storage names and IPs in
 `group_vars/all.yml`.

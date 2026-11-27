@@ -1,5 +1,10 @@
 ---
 # Install with: ansible-galaxy collection install -r requirements.yml
+#
+# PYTHON DEPENDENCY (not a Galaxy collection, install separately on the CONTROL
+# node): pywinrm — the `winrm` module Ansible's WinRM connection uses to reach
+# the Windows guests. `sudo apt install python3-winrm` (Debian/Ubuntu) or
+# `pip install pywinrm`. configure.yml asserts it is present before connecting.
 collections:
   # Proxmox VE VM lifecycle (proxmox_kvm, proxmox_disk, etc.)
   - name: community.general
