@@ -218,9 +218,14 @@ lab_vms:
     ip: "{{ lab_target_ip }}"
     mac: "02:00:00:40:00:03"
     computer_name: "target"
-    tools_iso: true          # attach a tools CD (carries the PS 5.1 bootstrap + Win7 SP1)
+    tools_iso: true          # attach a tools CD (carries the small PS 5.1 bootstrap)
     vendored_tools: *bootstrap_tools  # .NET 4.5.2 + WMF 5.1, installed at first logon
-    fetch_sp1: true          # put Win7 SP1 (KB976932) on that CD at build time
+    # SP1 is NOT put on the CD (that would make a ~1 GB tools ISO, and the PVE API
+    # upload buffers the whole file). The target role installs SP1 later over the
+    # network via win_get_url (sp1_url) once PS 5.1 is up — set fetch_sp1: true
+    # only if you specifically want it baked onto the CD and your node can take
+    # the large upload.
+    fetch_sp1: false
 
   - name: danderspritz
     vmid: 942
