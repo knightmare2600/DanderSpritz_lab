@@ -86,6 +86,17 @@
           loop_control:
             label: "{{ item.src }}"
 
+        # The PS 5.1 bootstrap batch (runs the .NET + WMF installs from the CD at
+        # first logon). Kept as a CD batch file rather than inline answer-file
+        # PowerShell, which proved unreliable in FirstLogonCommands.
+        - name: "{{ vm.name }} | add the PS 5.1 bootstrap script to the tools ISO root"
+          ansible.builtin.copy:
+            src: "{{ role_path }}/files/bootstrap-ps5.cmd"
+            dest: "{{ proxmox_vm_build_dir }}/{{ vm.name }}/tools_root/bootstrap-ps5.cmd"
+            remote_src: true
+            mode: "0644"
+          when: vm.bootstrap_ps5 | default(false)
+
         # The DanderSpritz toolset (EQGRP) and Win7 SP1 are too big for the repo:
         # fetch them once (cached) on the control node and bake them onto the CD.
         - name: "{{ vm.name }} | ensure the download cache dir exists"

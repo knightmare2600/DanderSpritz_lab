@@ -268,27 +268,15 @@
                     <RequiresUserInput>true</RequiresUserInput>
                 </SynchronousCommand>
                 <SynchronousCommand wcm:action="add">
-                    <!-- PS 5.1 bootstrap 1/3: install .NET 4.5.2 from the tools CD
-                         (WMF 5.1 requires it present first). PS 2.0 compatible. -->
-                    <CommandLine>cmd.exe /c powershell -Command "$f=Get-PSDrive -PSProvider FileSystem | ForEach-Object { Join-Path $_.Root 'NDP452-KB2901907-x86-x64-AllOS-ENU.exe' } | Where-Object { Test-Path $_ } | Select-Object -First 1; if($f){ Start-Process -FilePath $f -ArgumentList '/q','/norestart' -Wait }"</CommandLine>
-                    <Description>Install .NET 4.5.2 (PS5.1 prereq)</Description>
+                    <!-- PS 5.1 bootstrap: find the tools CD and run bootstrap-ps5.cmd
+                         from it. That batch installs .NET 4.5.2 + WMF 5.1 (located
+                         via %~dp0, next to it on the CD) and reboots. A batch file
+                         on the CD is used deliberately: the earlier inline
+                         `powershell -Command "...|...|..."` did not run reliably in
+                         FirstLogonCommands (pipe/quote handling). No pipes here. -->
+                    <CommandLine>cmd.exe /c for %D in (C D E F G H I J K L) do @if exist "%D:\bootstrap-ps5.cmd" call "%D:\bootstrap-ps5.cmd"</CommandLine>
+                    <Description>Bootstrap PowerShell 5.1 from the tools CD</Description>
                     <Order>25</Order>
-                    <RequiresUserInput>true</RequiresUserInput>
-                </SynchronousCommand>
-                <SynchronousCommand wcm:action="add">
-                    <!-- PS 5.1 bootstrap 2/3: install WMF 5.1 (PowerShell 5.1)
-                         from the tools CD via wusa. PS 2.0 compatible. -->
-                    <CommandLine>cmd.exe /c powershell -Command "$f=Get-PSDrive -PSProvider FileSystem | ForEach-Object { Join-Path $_.Root 'Win7AndW2K8R2-KB3191566-x64.msu' } | Where-Object { Test-Path $_ } | Select-Object -First 1; if($f){ Start-Process -FilePath 'wusa.exe' -ArgumentList $f,'/quiet','/norestart' -Wait }"</CommandLine>
-                    <Description>Install WMF 5.1 / PowerShell 5.1</Description>
-                    <Order>26</Order>
-                    <RequiresUserInput>true</RequiresUserInput>
-                </SynchronousCommand>
-                <SynchronousCommand wcm:action="add">
-                    <!-- PS 5.1 bootstrap 3/3: reboot to activate .NET + WMF. After
-                         this boot the box runs PS 5.1 and Ansible can manage it. -->
-                    <CommandLine>cmd.exe /c shutdown /r /t 90 /c "Rebooting to activate PowerShell 5.1"</CommandLine>
-                    <Description>Reboot to activate PowerShell 5.1</Description>
-                    <Order>27</Order>
                     <RequiresUserInput>true</RequiresUserInput>
                 </SynchronousCommand>
                 <!-- WITHOUT WINDOWS UPDATES -->

@@ -205,6 +205,7 @@ lab_vms:
     computer_name: "dc"
     tools_iso: true             # CD carrying the PS 5.1 bootstrap installers
     vendored_tools: *bootstrap_tools  # .NET 4.5.2 + WMF 5.1, installed at first logon
+    bootstrap_ps5: true         # also put bootstrap-ps5.cmd on the CD (runs the installs)
 
   - name: target
     vmid: 941
@@ -221,6 +222,7 @@ lab_vms:
     computer_name: "target"
     tools_iso: true          # attach a tools CD (carries the small PS 5.1 bootstrap)
     vendored_tools: *bootstrap_tools  # .NET 4.5.2 + WMF 5.1, installed at first logon
+    bootstrap_ps5: true      # also put bootstrap-ps5.cmd on the CD (runs the installs)
     # SP1 is NOT put on the CD (that would make a ~1 GB tools ISO, and the PVE API
     # upload buffers the whole file). The target role installs SP1 later over the
     # network via win_get_url (sp1_url) once PS 5.1 is up — set fetch_sp1: true
