@@ -44,7 +44,8 @@ windows_bootstrap_tools: &bootstrap_tools
     sha256: "6c2c589132e830a185c5f40f82042bee3022e721a216680bd9b3995ba86f3781"
   - src: "Win7AndW2K8R2-KB3191566-x64.msu"
     dest: 'C:\Windows\Temp\WMF51.msu'
-    sha256: ""   # set to the SHA-256 of your downloaded .msu to enforce verification
+    # From the official download.microsoft.com package (Win7AndW2K8R2-KB3191566-x64.zip, 68076477 bytes).
+    sha256: "c51abfc65dff5f6858c0b9f6420caa0c166df7a6d8b484f8a3c68ea99f0032b0"
 
 # DanderSpritz/FuzzBunch toolset. ~200 MB zipped — too big for the repo or LFS,
 # so build.yml downloads it once on the control node and bakes it onto the tools
