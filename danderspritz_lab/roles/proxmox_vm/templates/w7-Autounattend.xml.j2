@@ -245,6 +245,18 @@
                     <Order>22</Order>
                     <Description>Disable password expiration for vagrant user</Description>
                 </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <!-- Lab posture: the Network List Manager classifies the
+                         isolated LAN as Public by default. Force it Private via
+                         the NLM COM object (2008 R2 / Win7 have no
+                         Set-NetConnectionProfile). This target becomes
+                         DomainAuthenticated once joined; the step just fixes the
+                         pre-join window. -->
+                    <CommandLine>cmd.exe /c powershell -Command "for($i=0;$i -lt 12;$i++){ $nlm=[Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]'DCB00C01-570F-4A9B-8D69-199FDBA5723B')); $c=@($nlm.GetNetworkConnections()); if($c.Count -gt 0){ foreach($x in $c){ $x.GetNetwork().SetCategory(1) }; break }; Start-Sleep -Seconds 5 }"</CommandLine>
+                    <Description>Set network profile to Private</Description>
+                    <Order>23</Order>
+                    <RequiresUserInput>true</RequiresUserInput>
+                </SynchronousCommand>
                 <!-- WITHOUT WINDOWS UPDATES -->
 <!-- END WITHOUT WINDOWS UPDATES -->
                 <!-- WITH WINDOWS UPDATES -->

@@ -155,12 +155,14 @@
                     <RequiresUserInput>true</RequiresUserInput>
                 </SynchronousCommand>
                 <SynchronousCommand wcm:action="add">
-                    <!-- On Win10 a Public network profile makes `winrm quickconfig`
-                         refuse to create the HTTP listener, so 5985 never opens.
-                         Force every connection profile to Private first. The loop
-                         waits up to 60s for NLA to classify the NIC before setting
-                         it, so this works on a cold first logon. -->
-                    <CommandLine>cmd.exe /c powershell -Command "for($i=0;$i -lt 12;$i++){ $p=Get-NetConnectionProfile; if($p){ $p | Set-NetConnectionProfile -NetworkCategory Private; break }; Start-Sleep -Seconds 5 }"</CommandLine>
+                    <!-- On Win10 a Public network profile makes winrm quickconfig
+                         refuse to create the HTTP listener, so 5985 never opens;
+                         Public is also wrong lab posture on every box. Force the
+                         network Private via the Network List Manager COM object
+                         (the same mechanism used on 2008 R2 / Win7). The loop
+                         waits up to 60s for the NIC to be classified first, so
+                         this works on a cold first logon. -->
+                    <CommandLine>cmd.exe /c powershell -Command "for($i=0;$i -lt 12;$i++){ $nlm=[Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]'DCB00C01-570F-4A9B-8D69-199FDBA5723B')); $c=@($nlm.GetNetworkConnections()); if($c.Count -gt 0){ foreach($x in $c){ $x.GetNetwork().SetCategory(1) }; break }; Start-Sleep -Seconds 5 }"</CommandLine>
                     <Description>Set network profile to Private (so winrm quickconfig works)</Description>
                     <Order>4</Order>
                     <RequiresUserInput>true</RequiresUserInput>

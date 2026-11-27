@@ -12,11 +12,17 @@
 # whose WinRM is already down. First-contact is handled in the answer files.
 - name: "Re-assert WinRM reachability (profile, firewall, listener, service)"
   ansible.windows.win_shell: |
-    if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) {
-      Get-NetConnectionProfile |
-        Where-Object { $_.NetworkCategory -eq 'Public' } |
-        Set-NetConnectionProfile -NetworkCategory Private -ErrorAction SilentlyContinue
-    }
+    # Force any Public network to Private via the Network List Manager COM
+    # object. This works on 2008 R2 / Win7 (which have no Set-NetConnectionProfile
+    # cmdlet) as well as Win10. 0=Public, 1=Private, 2=DomainAuthenticated; a
+    # DC/target that has been promoted/joined is already 2, so leave those alone.
+    try {
+      $nlm = [Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]'DCB00C01-570F-4A9B-8D69-199FDBA5723B'))
+      foreach ($c in @($nlm.GetNetworkConnections())) {
+        $net = $c.GetNetwork()
+        if ($net.GetCategory() -eq 0) { $net.SetCategory(1) }
+      }
+    } catch { }
     netsh advfirewall firewall show rule name="WinRM-HTTP-5985" | Out-Null
     if ($LASTEXITCODE -ne 0) {
       netsh advfirewall firewall add rule name="WinRM-HTTP-5985" dir=in action=allow protocol=TCP localport=5985 profile=any | Out-Null
