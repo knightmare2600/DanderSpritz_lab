@@ -35,6 +35,18 @@
     reboot_timeout: 900
 
 # --- Service Pack 1 (long) --------------------------------------------------
+# Microsoft removed the original KB976932 download, so SP1 is delivered on the
+# tools CD (see group_vars/all.yml: fetch_sp1). Stage it to where Install-SP1.ps1
+# looks; if no CD file is found, the script falls back to the Internet Archive.
+- name: "Target | stage Win7 SP1 from the tools CD (if attached)"
+  ansible.windows.win_shell: |
+    $src = Get-PSDrive -PSProvider FileSystem |
+      ForEach-Object { Join-Path $_.Root '{{ sp1_file_name }}' } |
+      Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($src) { Copy-Item -LiteralPath $src -Destination 'C:\Windows\Temp\KB976932-X64.exe' -Force; "staged SP1 from CD" }
+    else { "SP1 not on CD; Install-SP1 will download from the Internet Archive" }
+  changed_when: true
+
 - name: "Target | install SP1"
   ansible.builtin.include_role:
     name: common_windows

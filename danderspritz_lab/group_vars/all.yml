@@ -17,7 +17,9 @@ guest_stage_dir: 'C:\lab'
 # where the matching Install-*.ps1 expects it on the guest (the scripts now use
 # the local file if present and fall back to downloading if not).
 tools_dir: "{{ lab_repo_root }}/tools"
-danderspritz_tools:
+# Anchored (&dsz_tools) so the danderspritz VM can reference this exact list as
+# its vendored_tools without duplicating it (see lab_vms below).
+danderspritz_tools: &dsz_tools
   - src: "jre-6u21-windows-i586.exe"
     dest: 'C:\Windows\Temp\jre6u14.exe'
     sha256: "3f97d83c3c822a78d3a486da42f814bfaf3296d747a43ab3566f6ac983a009c6"
@@ -38,6 +40,19 @@ danderspritz_tools:
 eqgrp_url: "https://codeload.github.com/x0rz/EQGRP_Lost_in_Translation/zip/refs/heads/master"
 eqgrp_zip_name: "EQGRP_Lost_in_Translation-master.zip"
 eqgrp_cache_dir: "{{ proxmox_vm_build_dir }}/cache"
+
+# Windows 7 SP1 (KB976932, x64) for the target. Microsoft REMOVED the original
+# download, so the live URL in the old Install-SP1.ps1 is dead. The target's
+# answer-file build fetches it (build.yml -> proxmox_vm, fetch_sp1: true) onto
+# the target's tools CD: a copy vendored in tools/ is preferred, otherwise it is
+# downloaded from the Internet Archive and SHA-256-verified. The guest installs
+# it straight off the CD (no ~903 MB download over the lab NAT); Install-SP1.ps1
+# still falls back to the archive URL if the CD file is absent.
+# sha256 is the published hash of windows6.1-KB976932-X64.exe (947,070,088 bytes).
+sp1_url: "https://web.archive.org/web/20110608170121id_/http://download.microsoft.com/download/0/A/F/0AFB5316-3062-494A-AB78-7FB0D4461357/windows6.1-KB976932-X64.exe"
+sp1_file_name: "windows6.1-KB976932-X64.exe"
+sp1_sha256: "f4d1d418d91b1619688a482680ee032ffd2b65e420c6d2eaecf8aa3762aa64c8"
+sp1_cache_dir: "{{ eqgrp_cache_dir }}"
 
 # --- Network -----------------------------------------------------------------
 lab_domain: windomain.local
@@ -180,6 +195,8 @@ lab_vms:
     ip: "{{ lab_target_ip }}"
     mac: "02:00:00:40:00:03"
     computer_name: "target"
+    tools_iso: true          # attach a tools CD (carries Win7 SP1)
+    fetch_sp1: true          # put Win7 SP1 (KB976932) on that CD at build time
 
   - name: danderspritz
     vmid: 942
@@ -195,4 +212,5 @@ lab_vms:
     mac: "02:00:00:40:00:04"
     computer_name: "danderspritz10"
     tools_iso: true          # attach the vendored-installers CD (danderspritz_tools)
+    vendored_tools: *dsz_tools  # the jre/python/pywin32 installers staged onto that CD
     fetch_eqgrp: true         # download the DanderSpritz toolset and add it to that CD

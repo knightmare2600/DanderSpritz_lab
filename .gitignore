@@ -7,3 +7,7 @@ packer.log
 
 # Wrong-architecture pywin32 (needs win32, not amd64) - keep it out of the repo
 tools/pywin32-221.win-amd64-py2.6.exe
+
+# Windows 7 SP1 installer (~903 MB) - vendored/fetched locally onto the target
+# tools CD, never committed (exceeds GitHub's 100 MB file limit)
+tools/windows6.1-KB976932-X64.exe

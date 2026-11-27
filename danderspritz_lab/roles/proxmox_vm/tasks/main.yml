@@ -82,18 +82,18 @@
             dest: "{{ proxmox_vm_build_dir }}/{{ vm.name }}/tools_root/{{ item.src }}"
             remote_src: true
             mode: "0644"
-          loop: "{{ danderspritz_tools }}"
+          loop: "{{ vm.vendored_tools | default([]) }}"
           loop_control:
             label: "{{ item.src }}"
 
-        # The DanderSpritz toolset is too big for the repo: download it once
-        # (cached) on the control node and bake it onto the same CD.
+        # The DanderSpritz toolset (EQGRP) and Win7 SP1 are too big for the repo:
+        # fetch them once (cached) on the control node and bake them onto the CD.
         - name: "{{ vm.name }} | ensure the download cache dir exists"
           ansible.builtin.file:
             path: "{{ eqgrp_cache_dir }}"
             state: directory
             mode: "0755"
-          when: vm.fetch_eqgrp | default(false)
+          when: (vm.fetch_eqgrp | default(false)) or (vm.fetch_sp1 | default(false))
 
         - name: "{{ vm.name }} | download the DanderSpritz toolset (cached)"
           ansible.builtin.get_url:
@@ -111,6 +111,35 @@
             remote_src: true
             mode: "0644"
           when: vm.fetch_eqgrp | default(false)
+
+        # Win7 SP1: prefer a copy vendored in tools/ (Microsoft removed the
+        # original download); otherwise fetch it from the Internet Archive,
+        # checksum-verified. Either way it is baked onto this VM's tools CD.
+        - name: "{{ vm.name }} | is Win7 SP1 vendored in tools/?"
+          ansible.builtin.stat:
+            path: "{{ tools_dir }}/{{ sp1_file_name }}"
+          register: _sp1_vendored
+          when: vm.fetch_sp1 | default(false)
+
+        - name: "{{ vm.name }} | download Win7 SP1 from the Internet Archive (if not vendored)"
+          ansible.builtin.get_url:
+            url: "{{ sp1_url }}"
+            dest: "{{ sp1_cache_dir }}/{{ sp1_file_name }}"
+            checksum: "sha256:{{ sp1_sha256 }}"
+            force: false
+            timeout: 120
+            mode: "0644"
+          when:
+            - vm.fetch_sp1 | default(false)
+            - not (_sp1_vendored.stat.exists | default(false))
+
+        - name: "{{ vm.name }} | add Win7 SP1 to the tools ISO root"
+          ansible.builtin.copy:
+            src: "{{ (tools_dir ~ '/' ~ sp1_file_name) if (_sp1_vendored.stat.exists | default(false)) else (sp1_cache_dir ~ '/' ~ sp1_file_name) }}"
+            dest: "{{ proxmox_vm_build_dir }}/{{ vm.name }}/tools_root/{{ sp1_file_name }}"
+            remote_src: true
+            mode: "0644"
+          when: vm.fetch_sp1 | default(false)
 
         - name: "{{ vm.name }} | build the tools ISO"
           ansible.builtin.command:

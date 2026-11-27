@@ -44,11 +44,11 @@ Downloaded at build time and baked onto the tools CD (not in the repo — ~200 M
 |------|-----------|--------|----------|
 | `EQGRP_Lost_in_Translation` | **DanderSpritz + FuzzBunch themselves** — extracted to `C:\Users\vagrant\eqtools` | `codeload.github.com/x0rz/EQGRP_Lost_in_Translation/zip/refs/heads/master` (`eqgrp_url`) | `build.yml` downloads it once on the control node (cached in `eqgrp_cache_dir`), adds the zip to the tools CD, and the guest expands it — no git/internet needed on the guest. `Install-DanderSpritz.ps1` falls back to `git clone` if the zip isn't staged. The upstream repo has been dormant ~9 years, so the master archive is effectively a fixed snapshot — pinning a commit in `eqgrp_url` is optional. Set `fetch_eqgrp: false` to skip and clone on the guest instead. |
 
-## Target box (Windows 7) — kept as a live download
+## Target box (Windows 7) — SP1 on the tools CD
 
 | Filename | What it is | Source | Decision |
 |----------|-----------|--------|----------|
-| `windows6.1-KB976932-X64.exe` | Windows 7 **SP1** (~903 MB; the script saves it as `KB976932-X64.exe`) | `download.microsoft.com/download/0/A/F/...` | **Not vendored** — too big for comfort, and it's Microsoft-hosted (lowest rot risk). Left as a live download |
+| `windows6.1-KB976932-X64.exe` | Windows 7 **SP1** (~903 MB; the script saves it as `KB976932-X64.exe`; SHA-256 `f4d1d418…aa64c8`) | Internet Archive snapshot of `download.microsoft.com/download/0/A/F/...` (`sp1_url`) — **Microsoft removed the original** | **Fetched onto the target's tools CD** (`fetch_sp1: true`): a copy vendored in `tools/` is preferred, else `build.yml` downloads it from the archive (SHA-256-verified via `sp1_sha256`) and bakes it on. The guest installs it straight off the CD; `Install-SP1.ps1` falls back to the archive URL only if the CD file is absent. |
 
 ## Domain controller (Server 2008 R2)
 

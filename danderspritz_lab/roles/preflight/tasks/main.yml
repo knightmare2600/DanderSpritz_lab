@@ -93,14 +93,21 @@
     - pf_pvesm.rc | default(1) != 0
 
 # --- Vendored tools (read straight from the repo on the control node) -------
-- name: "preflight | check the vendored tools for the selected VMs"
-  when: (_selected_vms | selectattr('tools_iso', 'defined') | selectattr('tools_iso') | list | length) > 0
+# The union of vendored_tools across the selected VMs (each must be present in
+# tools/ with the right SHA-256). SP1 is handled separately below because it is
+# fetched-if-absent, not mandatory in tools/.
+- name: "preflight | gather vendored installers for the selected VMs"
+  ansible.builtin.set_fact:
+    _pf_vendored: "{{ _selected_vms | selectattr('vendored_tools', 'defined') | map(attribute='vendored_tools') | flatten | list }}"
+
+- name: "preflight | check the vendored installers"
+  when: (_pf_vendored | length) > 0
   block:
     - name: "preflight | stat + SHA-256 each vendored installer in {{ tools_dir }}"
       ansible.builtin.stat:
         path: "{{ tools_dir }}/{{ item.src }}"
         checksum_algorithm: sha256
-      loop: "{{ danderspritz_tools }}"
+      loop: "{{ _pf_vendored }}"
       register: pf_tools
       loop_control:
         label: "{{ item.src }}"
@@ -121,3 +128,28 @@
       loop: "{{ pf_tools.results }}"
       loop_control:
         label: "{{ item.item.src }}"
+
+# --- Win7 SP1 (fetch-if-absent, so not mandatory in tools/) -----------------
+- name: "preflight | check Win7 SP1 for the fetch_sp1 VMs"
+  when: (_selected_vms | selectattr('fetch_sp1', 'defined') | selectattr('fetch_sp1') | list | length) > 0
+  block:
+    - name: "preflight | is Win7 SP1 vendored in tools/?"
+      ansible.builtin.stat:
+        path: "{{ tools_dir }}/{{ sp1_file_name }}"
+        checksum_algorithm: sha256
+      register: pf_sp1
+
+    - name: "preflight | SP1 is a correct vendored file, or will be fetched"
+      ansible.builtin.assert:
+        that:
+          - (not pf_sp1.stat.exists) or (pf_sp1.stat.checksum == sp1_sha256)
+        fail_msg: >-
+          {{ tools_dir }}/{{ sp1_file_name }} exists but its SHA-256
+          ({{ pf_sp1.stat.checksum | default('?') }}) does not match the expected
+          {{ sp1_sha256 }} — wrong or corrupt SP1 installer. Remove it to let the
+          build fetch a verified copy from the Internet Archive instead.
+        success_msg: >-
+          {{ 'SP1 vendored in tools/ and SHA-256 OK'
+             if pf_sp1.stat.exists
+             else 'SP1 not vendored — will be fetched from the Internet Archive (SHA-256-verified) at build' }}
+        quiet: true
