@@ -256,6 +256,16 @@
                     <Order>23</Order>
                     <RequiresUserInput>true</RequiresUserInput>
                 </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <!-- Raise the WinRM envelope limit: this old WinRM (2008 R2)
+                         defaults too low for large Ansible module payloads under
+                         NTLM's single encrypted envelope, which otherwise fails
+                         with HTTP 413. -->
+                    <CommandLine>cmd.exe /c winrm set winrm/config @{MaxEnvelopeSizekb="8192"}</CommandLine>
+                    <Description>WinRM MaxEnvelopeSizekb</Description>
+                    <Order>24</Order>
+                    <RequiresUserInput>true</RequiresUserInput>
+                </SynchronousCommand>
                 <!-- WITHOUT WINDOWS UPDATES -->
 <!-- END WITHOUT WINDOWS UPDATES -->
                 <!-- WITH WINDOWS UPDATES -->
