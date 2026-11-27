@@ -76,6 +76,25 @@
   delegate_to: localhost
   run_once: true
 
+# --- Network profile = Private (lab posture) --------------------------------
+# Set here, over WinRM on PS 5.1, rather than in the answer file: inline
+# PowerShell in FirstLogonCommands proved unreliable. This only flips the
+# Network List Manager category (0 Public -> 1 Private); it does NOT touch the
+# WinRM service/listener, so it cannot drop the connection the way the old
+# self-heal did. A promoted/joined box is already category 2 (Domain) and is
+# left alone. No apostrophes in these comments (win_shell is free-form).
+- name: "Set the network profile to Private"
+  ansible.windows.win_shell: |
+    try {
+      $nlm = [Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]'DCB00C01-570F-4A9B-8D69-199FDBA5723B'))
+      foreach ($c in @($nlm.GetNetworkConnections())) {
+        $net = $c.GetNetwork()
+        if ($net.GetCategory() -eq 0) { $net.SetCategory(1) }
+      }
+    } catch { }
+  changed_when: false
+  failed_when: false
+
 # --- Proxmox guest agent (was VirtualBox guest additions) -------------------
 # The qemu-ga MSI ships on the virtio-win ISO. If that ISO is still attached it
 # is the simplest source; otherwise install it out of band and set
