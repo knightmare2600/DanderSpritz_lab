@@ -32,8 +32,10 @@
       winrm create winrm/config/Listener?Address=*+Transport=HTTP '@{Port="5985"}' | Out-Null
     }
     # Raise the WinRM envelope limit. Old WinRM (2008 R2 / Win7) defaults too low
-    # for large Ansible module payloads under NTLM's single encrypted envelope,
+    # for large Ansible module payloads under the single encrypted NTLM envelope,
     # which otherwise fails with HTTP 413. Keeps it asserted across reboots.
+    # (No apostrophes in these comments: win_shell is free-form and Ansible
+    # quote-balances the whole block.)
     winrm set winrm/config '@{MaxEnvelopeSizekb="8192"}' | Out-Null
     Set-Service -Name WinRM -StartupType Automatic
     Start-Service -Name WinRM -ErrorAction SilentlyContinue
