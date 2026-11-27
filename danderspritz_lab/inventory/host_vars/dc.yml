@@ -1,5 +1,6 @@
 ---
 # Windows Server 2008 R2 domain controller.
-# After promotion the local `vagrant` account becomes a domain account. If WinRM
-# basic auth fails post-promotion, uncomment the domain-qualified user:
+# After promotion the local `vagrant` account becomes a domain account. The
+# default NTLM transport (group_vars/windows.yml) authenticates domain accounts,
+# so if a post-promotion task is rejected, uncomment the domain-qualified user:
 # ansible_user: "windomain\\vagrant"

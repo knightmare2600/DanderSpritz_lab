@@ -31,6 +31,36 @@
         success_msg: "pywinrm present"
         quiet: true
 
+    # The ntlm transport (the default, see group_vars/windows.yml) needs the
+    # requests-ntlm module in addition to pywinrm. Only enforced when NTLM is
+    # actually selected, so switching back to basic does not demand it.
+    - name: "Work out which WinRM transport the windows hosts use"
+      ansible.builtin.set_fact:
+        _winrm_transport: "{{ hostvars[groups['windows'][0]].ansible_winrm_transport | default('basic') }}"
+      when: (groups['windows'] | default([]) | length) > 0
+
+    - name: "Is requests_ntlm importable by this Ansible interpreter?"
+      ansible.builtin.command: "{{ ansible_playbook_python }} -c \"import requests_ntlm\""
+      changed_when: false
+      failed_when: false
+      register: _ntlm_check
+      when: (_winrm_transport | default('basic')) == 'ntlm'
+
+    - name: "requests-ntlm must be installed when the ntlm transport is used"
+      ansible.builtin.assert:
+        that:
+          - _ntlm_check.rc == 0
+        fail_msg: >-
+          ansible_winrm_transport is 'ntlm' but the python 'requests_ntlm'
+          module is not available to this Ansible (interpreter:
+          {{ ansible_playbook_python }}). Install it on the CONTROL node, e.g.
+          `sudo apt install python3-requests-ntlm` (Debian/Ubuntu) or
+          `pip install requests_ntlm`, then re-run — or set
+          ansible_winrm_transport=basic to use the Basic transport instead.
+        success_msg: "requests-ntlm present"
+        quiet: true
+      when: (_winrm_transport | default('basic')) == 'ntlm'
+
 - name: Common Windows preparation (all guests)
   hosts: windows
   gather_facts: false

@@ -44,8 +44,11 @@ once.
    - The Ansible collections: `ansible-galaxy collection install -r requirements.yml`.
    - **pywinrm** — the python `winrm` module, needed by Ansible's WinRM
      connection to configure the guests: `sudo apt install python3-winrm`
-     (Debian/Ubuntu) or `pip install pywinrm`. `configure.yml` checks for it up
-     front and fails with this instruction if it is missing.
+     (Debian/Ubuntu) or `pip install pywinrm`.
+   - **requests-ntlm** — needed for the NTLM transport (the default; see
+     `group_vars/windows.yml`): `sudo apt install python3-requests-ntlm` or
+     `pip install requests_ntlm`. `configure.yml` checks for both up front and
+     fails with the install command if either is missing.
 
 Set the real `proxmox_api_host`, `proxmox_node`, storage names and IPs in
 `group_vars/all.yml`.
@@ -96,8 +99,10 @@ need a tweak for your node — none are hand-waved:
   the CD letter, and widen the list. Alternative: use SATA for
   the disk and skip injection.
 - **Post-promotion DC credentials.** After `dcpromo`, `vagrant` becomes a domain
-  account; you may need `ansible_user: "windomain\\vagrant"` (see
-  `inventory/host_vars/dc.yml`).
+  account. The default NTLM transport authenticates domain accounts, so set
+  `ansible_user: "windomain\\vagrant"` (see `inventory/host_vars/dc.yml`) if a
+  post-promotion task is rejected. (Basic auth cannot do this — another reason
+  NTLM is the default.)
 - **ISO / tool URL rot.** Several `../scripts/*.ps1` download tools from the
   internet (DanderSpritz, JRE 6u21, WinPython, FLARE packages). Those URLs were
   already fragile in the original project; this port does not fix them. The lab

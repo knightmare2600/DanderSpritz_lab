@@ -1,14 +1,21 @@
 ---
 # WinRM connection settings for every host in the `windows` group.
-# These match what the answer files configure on first logon (HTTP/5985,
-# AllowUnencrypted + Basic). Fine for an isolated lab; for anything else switch
-# to HTTPS/5986 with a cert and transport: ntlm/credssp.
+# Transport is NTLM (Negotiate), which WinRM enables by DEFAULT — so it works
+# as soon as WinRM is listening, without depending on the answer file's
+# Basic / AllowUnencrypted steps having run (that dependency is exactly what bit
+# the Win10 box on first build). NTLM also authenticates domain accounts
+# (e.g. windomain\vagrant) after the DC is promoted, which Basic cannot, and it
+# does message-level encryption even over plain HTTP. It needs the
+# `requests-ntlm` python module on the control node (configure.yml checks for
+# it). The answer files still enable Basic too, so basic remains available as a
+# fallback if you set ansible_winrm_transport=basic. For anything beyond an
+# isolated lab, move to HTTPS/5986 with a cert.
 ansible_connection: winrm
 ansible_user: "{{ lab_admin_user }}"
 ansible_password: "{{ lab_admin_password }}"
 ansible_port: 5985
 ansible_winrm_scheme: http
-ansible_winrm_transport: basic
+ansible_winrm_transport: ntlm
 ansible_winrm_server_cert_validation: ignore
 # Old Windows + long installs: don't let the read time out mid-operation.
 ansible_winrm_read_timeout_sec: 300
