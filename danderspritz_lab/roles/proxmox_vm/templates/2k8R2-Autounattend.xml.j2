@@ -186,7 +186,7 @@
                     <RequiresUserInput>true</RequiresUserInput>
                 </SynchronousCommand>
                 <SynchronousCommand wcm:action="add">
-                    <CommandLine>cmd.exe /c netsh firewall add portopening TCP 5985 "Port 5985" </CommandLine>
+                    <CommandLine>cmd.exe /c netsh advfirewall firewall add rule name="WinRM-HTTP-5985" dir=in action=allow protocol=TCP localport=5985 profile=any</CommandLine>
                     <Description>Win RM port open</Description>
                     <Order>12</Order>
                     <RequiresUserInput>true</RequiresUserInput>
@@ -250,19 +250,47 @@
                 <!--
 -->
                 <!-- END WITH WINDOWS UPDATES -->
-{% if (lab_network_mode | default('managed')) != 'routed' %}
-                            <SynchronousCommand wcm:action="add">
-                    <CommandLine>cmd.exe /c powershell -NoProfile -Command "for($i=0;$i -lt 30;$i++){$c=Get-WmiObject Win32_NetworkAdapterConfiguration -Filter 'IPEnabled=TRUE' | Select-Object -First 1; if($c){$r=$c.EnableStatic('{{ vm.ip }}','255.255.255.0'); if($r.ReturnValue -eq 0 -or $r.ReturnValue -eq 1){$c.SetGateways('{{ lab_gateway }}') | Out-Null; $c.SetDNSServerSearchOrder(@('{{ lab_dns_upstream[0] }}','{{ lab_dns_upstream[1] }}')) | Out-Null; break}}; Start-Sleep -Seconds 5}"</CommandLine>
-                    <Description>Set static lab IP so Ansible can reach the guest</Description>
-                    <Order>30</Order>
-                    <RequiresUserInput>true</RequiresUserInput>
-                </SynchronousCommand>
-{% endif %}
 </FirstLogonCommands>
             <ShowWindowsLive>false</ShowWindowsLive>
         </component>
     </settings>
     <settings pass="specialize">
+{% if (lab_network_mode | default('managed')) != 'routed' %}
+        <component name="Microsoft-Windows-TCPIP" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <Interfaces>
+                <Interface wcm:action="add">
+                    <Identifier>{{ vm.mac | replace(':','-') | upper }}</Identifier>
+                    <Ipv4Settings>
+                        <DhcpEnabled>false</DhcpEnabled>
+                        <RouterDiscoveryEnabled>false</RouterDiscoveryEnabled>
+                        <Metric>10</Metric>
+                    </Ipv4Settings>
+                    <UnicastIpAddresses>
+                        <IpAddress wcm:action="add" wcm:keyValue="1">{{ vm.ip }}/{{ lab_netmask }}</IpAddress>
+                    </UnicastIpAddresses>
+                    <Routes>
+                        <Route wcm:action="add">
+                            <Identifier>0</Identifier>
+                            <Prefix>0.0.0.0/0</Prefix>
+                            <NextHopAddress>{{ lab_gateway }}</NextHopAddress>
+                            <Metric>10</Metric>
+                        </Route>
+                    </Routes>
+                </Interface>
+            </Interfaces>
+        </component>
+        <component name="Microsoft-Windows-DNS-Client" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <Interfaces>
+                <Interface wcm:action="add">
+                    <Identifier>{{ vm.mac | replace(':','-') | upper }}</Identifier>
+                    <DNSServerSearchOrder>
+                        <IpAddress wcm:action="add" wcm:keyValue="1">{{ lab_dns_upstream[0] }}</IpAddress>
+                        <IpAddress wcm:action="add" wcm:keyValue="2">{{ lab_dns_upstream[1] }}</IpAddress>
+                    </DNSServerSearchOrder>
+                </Interface>
+            </Interfaces>
+        </component>
+{% endif %}
         <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
             <OEMInformation>
                 <HelpCustomized>false</HelpCustomized>

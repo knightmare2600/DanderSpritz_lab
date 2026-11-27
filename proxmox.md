@@ -69,7 +69,7 @@ for you to hand-build.
 
 In this mode the lab hosts get their documented addresses by **DHCP reservation**
 (each VM has a fixed `mac` in `lab_vms`; the gateway's dnsmasq maps MAC → `.2/.3/.4`,
-outside the pool) rather than the in-guest static-IP command, which is skipped —
+outside the pool) rather than the answer file's native static IP, which is skipped —
 far more reliable than configuring static IPs inside Windows at first boot. Extra
 hosts dropped on the lab net get a `.100–150` lease.
 

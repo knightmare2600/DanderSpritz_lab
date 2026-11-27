@@ -166,9 +166,10 @@ Proxmox port keeps the **same split** but swaps the tools:
   tiny per-VM answer-file ISO and attaching the `virtio-win` ISO.
 * The existing **`answer_files/`** are reused untouched as the source: they are
   rendered as templates with two things injected — virtio `DriverPaths` in the
-  `windowsPE` pass (so Setup sees a virtio-scsi disk) and a static-IP
-  first-logon command (there is no DHCP on the isolated lab bridge, so each
-  guest self-assigns its address before Ansible connects).
+  `windowsPE` pass (so Setup sees a virtio-scsi disk) and, in the static modes,
+  a native static IP via `Microsoft-Windows-TCPIP` keyed by the VM's fixed MAC
+  (there is no DHCP on the isolated bridge). In `routed` mode the gateway hands
+  out the addresses by DHCP reservation instead, so no in-guest IP is set.
 * **`configure.yml` → roles** run the existing **`scripts/*.ps1`** over WinRM in
   the original order and with the original reboots. VirtualBox guest additions
   become `qemu-guest-agent`; the Packer floppy/OpenSSH bootstrap is dropped

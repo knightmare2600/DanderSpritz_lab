@@ -15,7 +15,7 @@ Ansible instead of Vagrant.
 | Old | New |
 |-----|-----|
 | Packer unattended install from ISO | `build.yml` → `roles/proxmox_vm` (`community.general.proxmox_kvm` + a generated answer-file ISO) |
-| `Autounattend.xml` answer files | **Reused.** Rendered as templates with virtio `DriverPaths` + a static-IP first-logon command injected (`roles/proxmox_vm/templates/*.j2`, generated from `../answer_files/`) |
+| `Autounattend.xml` answer files | **Reused.** Rendered as templates with virtio `DriverPaths`, a proper WinRM 5985 firewall rule, and (static modes) a native `Microsoft-Windows-TCPIP` static IP keyed by MAC (`roles/proxmox_vm/templates/*.j2`, from `../answer_files/`) |
 | Packer provisioners / Vagrant provisioners | `configure.yml` → `roles/{common_windows,domain_controller,target,danderspritz}`, which run the **existing** `../scripts/*.ps1` over WinRM |
 | VirtualBox guest additions (`vm-guest-tools.bat`) | qemu-guest-agent (from the virtio-win ISO) |
 | `vagrant-ssh.bat` / OpenSSH | dropped — Ansible connects over WinRM, which the answer files enable on first logon |
