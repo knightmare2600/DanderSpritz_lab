@@ -45,11 +45,16 @@ eqgrp_cache_dir: "{{ proxmox_vm_build_dir }}/cache"
 # download, so the live URL in the old Install-SP1.ps1 is dead. The target's
 # answer-file build fetches it (build.yml -> proxmox_vm, fetch_sp1: true) onto
 # the target's tools CD: a copy vendored in tools/ is preferred, otherwise it is
-# downloaded from the Internet Archive and SHA-256-verified. The guest installs
-# it straight off the CD (no ~903 MB download over the lab NAT); Install-SP1.ps1
-# still falls back to the archive URL if the CD file is absent.
-# sha256 is the published hash of windows6.1-KB976932-X64.exe (947,070,088 bytes).
-sp1_url: "https://web.archive.org/web/20110608170121id_/http://download.microsoft.com/download/0/A/F/0AFB5316-3062-494A-AB78-7FB0D4461357/windows6.1-KB976932-X64.exe"
+# downloaded from the Internet Archive and SHA-256-verified. On an already-built
+# target with no CD, the target role instead downloads it on the guest (also
+# SHA-256-verified) — so SP1 works with or without a rebuild. Install-SP1.ps1
+# only runs the staged, verified file; it never downloads.
+# sp1_url points at a dedicated Internet Archive *item* (not a Wayback capture —
+# those truncate ~900 MB files): its archive-computed MD5 (28d3932f…) and size
+# (947,070,088) match the published values, so it is the genuine installer.
+# Every path (build-side get_url, guest-side win_get_url) SHA-256-verifies the
+# file against sp1_sha256, so a corrupt download is caught, not installed.
+sp1_url: "https://archive.org/download/windows6.1-kb976932-x64_74865ef2562006e51d7f9333b4a8d45b7a749dab/windows6.1-kb976932-x64.exe"
 sp1_file_name: "windows6.1-KB976932-X64.exe"
 sp1_sha256: "f4d1d418d91b1619688a482680ee032ffd2b65e420c6d2eaecf8aa3762aa64c8"
 sp1_cache_dir: "{{ eqgrp_cache_dir }}"

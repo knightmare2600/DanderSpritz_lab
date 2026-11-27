@@ -48,7 +48,7 @@ Downloaded at build time and baked onto the tools CD (not in the repo — ~200 M
 
 | Filename | What it is | Source | Decision |
 |----------|-----------|--------|----------|
-| `windows6.1-KB976932-X64.exe` | Windows 7 **SP1** (~903 MB; the script saves it as `KB976932-X64.exe`; SHA-256 `f4d1d418…aa64c8`) | Internet Archive snapshot of `download.microsoft.com/download/0/A/F/...` (`sp1_url`) — **Microsoft removed the original** | **Fetched onto the target's tools CD** (`fetch_sp1: true`): a copy vendored in `tools/` is preferred, else `build.yml` downloads it from the archive (SHA-256-verified via `sp1_sha256`) and bakes it on. The guest installs it straight off the CD; `Install-SP1.ps1` falls back to the archive URL only if the CD file is absent. |
+| `windows6.1-KB976932-X64.exe` | Windows 7 **SP1** (~903 MB / 947,070,088 bytes; saved on the guest as `KB976932-X64.exe`; SHA-256 `f4d1d418…aa64c8`) | A dedicated **Internet Archive item** (`sp1_url`) whose archive-computed MD5+size match the published installer — **Microsoft removed the original** (do not use a Wayback `id_` capture; those truncate large files) | **Fetched onto the target's tools CD** (`fetch_sp1: true`): a copy vendored in `tools/` is preferred, else `build.yml` downloads it (SHA-256-verified via `sp1_sha256`). On an already-built target with no CD, the target role downloads it on the guest instead (also SHA-256-verified). Override `sp1_url` with a LAN HTTP URL to serve a vendored copy from the control node and avoid the pull over the lab NAT. `Install-SP1.ps1` only runs the staged, verified file. |
 
 ## Domain controller (Server 2008 R2)
 
