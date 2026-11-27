@@ -3,44 +3,13 @@
 # vm-guest-tools.bat -> qemu-guest-agent, enable-rdp.bat, Install-Chocolatey.ps1.
 # (vagrant-ssh.bat is dropped - Ansible uses WinRM.)
 
-# --- Self-heal WinRM reachability ------------------------------------------
-# Runs first, every configure pass. Guards against a reboot re-classifying the
-# NIC as Public (which blocks WinRM on Win10/2012+) and against firewall /
-# listener / service drift. Idempotent and safe on Win7 / 2008 R2, where
-# Set-NetConnectionProfile does not exist (the guard skips it there).
-# NOTE: this corrects drift on a reachable box; it cannot bootstrap a guest
-# whose WinRM is already down. First-contact is handled in the answer files.
-- name: "Re-assert WinRM reachability (profile, firewall, listener, service)"
-  ansible.windows.win_shell: |
-    # Force any Public network to Private via the Network List Manager COM
-    # object. This works on 2008 R2 / Win7 (which have no Set-NetConnectionProfile
-    # cmdlet) as well as Win10. 0=Public, 1=Private, 2=DomainAuthenticated; a
-    # DC/target that has been promoted/joined is already 2, so leave those alone.
-    try {
-      $nlm = [Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]'DCB00C01-570F-4A9B-8D69-199FDBA5723B'))
-      foreach ($c in @($nlm.GetNetworkConnections())) {
-        $net = $c.GetNetwork()
-        if ($net.GetCategory() -eq 0) { $net.SetCategory(1) }
-      }
-    } catch { }
-    netsh advfirewall firewall show rule name="WinRM-HTTP-5985" | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-      netsh advfirewall firewall add rule name="WinRM-HTTP-5985" dir=in action=allow protocol=TCP localport=5985 profile=any | Out-Null
-    }
-    $listeners = winrm enumerate winrm/config/listener 2>$null
-    if ($listeners -notmatch 'Transport\s*=\s*HTTP') {
-      winrm create winrm/config/Listener?Address=*+Transport=HTTP '@{Port="5985"}' | Out-Null
-    }
-    # Raise the WinRM envelope limit. Old WinRM (2008 R2 / Win7) defaults too low
-    # for large Ansible module payloads under the single encrypted NTLM envelope,
-    # which otherwise fails with HTTP 413. Keeps it asserted across reboots.
-    # (No apostrophes in these comments: win_shell is free-form and Ansible
-    # quote-balances the whole block.)
-    winrm set winrm/config '@{MaxEnvelopeSizekb="8192"}' | Out-Null
-    Set-Service -Name WinRM -StartupType Automatic
-    Start-Service -Name WinRM -ErrorAction SilentlyContinue
-  changed_when: false
-  failed_when: false
+# NOTE: WinRM reachability (network profile = Private, the 5985 firewall rule,
+# the HTTP listener, MaxEnvelopeSizekb and the service) is configured ONCE at
+# first logon by the answer files (roles/proxmox_vm/templates/*.j2). It is NOT
+# re-asserted here over WinRM every run: doing that reconfigured the WinRM
+# service/config through the very connection in use and dropped the pipelined
+# session (hangs / 413). A box built before those answer-file fixes needs the
+# settings applied on its console once (see README "Known rough edges").
 
 # --- Stage the repo scripts/ tree ------------------------------------------
 # win_copy of the whole tree (121 files) over WinRM is pathologically slow and
