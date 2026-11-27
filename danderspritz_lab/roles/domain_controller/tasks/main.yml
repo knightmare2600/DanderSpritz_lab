@@ -7,30 +7,22 @@
 # becomes a domain account. If WinRM basic auth stops working afterwards, set in
 # inventory/host_vars/dc.yml:   ansible_user: "windomain\\vagrant"
 
-# --- .NET 4.5 ---------------------------------------------------------------
-- name: "DC | install .NET 4.5"
+# --- .NET 4.5 + PowerShell 5 come from the first-logon bootstrap ------------
+# (roles/proxmox_vm/templates/2k8R2-Autounattend.xml.j2 -> bootstrap-ps5.cmd
+# installs .NET 4.5.2 then WMF 5.1 from the tools CD before Ansible connects).
+# The old choco-based Install-dotnet45.ps1 / Install-Powershell5.ps1 are NOT run
+# here: both are already present, and choco is not on PATH at this point anyway.
+
+# --- Hostname ---------------------------------------------------------------
+- name: "DC | set hostname"
   ansible.builtin.include_role:
     name: common_windows
     tasks_from: run_ps_scripts
   vars:
     ps_scripts:
-      - "WinDC\\Install-dotnet45.ps1"
-
-- name: "DC | reboot after .NET"
-  ansible.windows.win_reboot:
-    reboot_timeout: 900
-
-# --- PowerShell 5 + hostname ------------------------------------------------
-- name: "DC | install PowerShell 5 and set hostname"
-  ansible.builtin.include_role:
-    name: common_windows
-    tasks_from: run_ps_scripts
-  vars:
-    ps_scripts:
-      - "WinDC\\Install-Powershell5.ps1"
       - "WinDC\\Set-Hostname-dc.ps1"
 
-- name: "DC | reboot after PowerShell 5 / rename"
+- name: "DC | reboot after rename"
   ansible.windows.win_reboot:
     reboot_timeout: 900
 
