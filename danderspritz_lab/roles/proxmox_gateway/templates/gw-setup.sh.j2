@@ -49,7 +49,7 @@ flush ruleset
 table ip nat {
     chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
-        oifname "eth0" ip daddr != { {{ ([gw_mgmt_subnet] + (lab_gateway_extra_route_nets | default([]))) | join(', ') }} } masquerade
+        oifname "eth0" ip daddr != { {{ ([gw_mgmt_subnet] + _gw_extra_nets) | join(', ') }} } masquerade
     }
 }
 EOF

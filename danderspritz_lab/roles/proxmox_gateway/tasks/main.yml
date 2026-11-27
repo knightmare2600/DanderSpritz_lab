@@ -132,6 +132,14 @@
   ansible.builtin.set_fact:
     gw_wan_ip: "{{ gw_wan_addr.stdout | regex_search('inet ([0-9.]+)/', '\\1') | first }}"
     gw_mgmt_subnet: "{{ gw_wan_route.stdout | regex_search('([0-9.]+/[0-9]+)', '\\1') | first }}"
+    # Normalise extra-route-nets to a list whether it arrives as a real list, a
+    # JSON-ish string (-e var='["a","b"]'), or a comma-separated string.
+    _gw_extra_nets: >-
+      {{ lab_gateway_extra_route_nets
+         if (lab_gateway_extra_route_nets is sequence and lab_gateway_extra_route_nets is not string)
+         else ((lab_gateway_extra_route_nets | from_yaml)
+               if ((lab_gateway_extra_route_nets | string | trim).startswith('['))
+               else ((lab_gateway_extra_route_nets | string).split(',') | map('trim') | reject('equalto', '') | list)) }}
 
 - name: "gw | WAN IP and mgmt subnet must have been discovered"
   ansible.builtin.assert:
@@ -178,7 +186,7 @@
       {{ lab_gateway }}/{{ lab_netmask }} on {{ proxmox_lab_bridge }}, WAN {{ gw_wan_ip }}
       on {{ lab_gateway_wan_bridge }}, DHCP {{ lab_dhcp_range_start }}-{{ lab_dhcp_range_end }}.
       Internet-bound traffic is NAT'd; routed (no NAT) to:
-      {{ ([gw_mgmt_subnet] + (lab_gateway_extra_route_nets | default([]))) | join(', ') }}.
+      {{ ([gw_mgmt_subnet] + _gw_extra_nets) | join(', ') }}.
       {{ 'Control-node route to ' ~ lab_subnet ~ '.0/' ~ lab_netmask ~ ' via ' ~ gw_wan_ip ~ ' is in place.'
          if gw_route.rc == 0
          else ('NEEDED: route ' ~ lab_subnet ~ '.0/' ~ lab_netmask ~ ' via ' ~ gw_wan_ip
