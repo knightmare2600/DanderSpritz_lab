@@ -36,18 +36,20 @@ EOF
 systemctl enable dnsmasq
 systemctl restart dnsmasq
 
-# NAT: masquerade only INTERNET-bound traffic out of the WAN interface. The mgmt
-# subnet ({{ gw_mgmt_subnet }}, where the control node lives) is excluded, so the
-# lab <-> control-node path is plain-routed both ways — that's what lets WinRM
-# from the control node reach the guests THROUGH this router (it forwards, it
-# doesn't terminate WinRM). Forwarding is open (no filter table, ip_forward on).
+# NAT: masquerade only INTERNET-bound traffic out of the WAN interface. The
+# internal networks below are EXCLUDED, so the lab <-> those networks are
+# plain-routed both ways (no NAT on the return path) — that's what lets a control
+# node reach the guests THROUGH this router (it forwards, it doesn't terminate
+# WinRM). Excluded: the gateway's own mgmt subnet ({{ gw_mgmt_subnet }}) plus any
+# lab_gateway_extra_route_nets (e.g. the control host's subnet if it's elsewhere).
+# Forwarding is open (no filter table, ip_forward on).
 cat > /etc/nftables.conf <<'EOF'
 #!/usr/sbin/nft -f
 flush ruleset
 table ip nat {
     chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
-        oifname "eth0" ip daddr != {{ gw_mgmt_subnet }} masquerade
+        oifname "eth0" ip daddr != { {{ ([gw_mgmt_subnet] + (lab_gateway_extra_route_nets | default([]))) | join(', ') }} } masquerade
     }
 }
 EOF

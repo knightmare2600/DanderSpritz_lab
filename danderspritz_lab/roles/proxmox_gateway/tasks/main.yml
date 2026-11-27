@@ -177,8 +177,11 @@
       Lab gateway LXC {{ lab_gateway_vmid }} ({{ lab_gateway_hostname }}) is up:
       {{ lab_gateway }}/{{ lab_netmask }} on {{ proxmox_lab_bridge }}, WAN {{ gw_wan_ip }}
       on {{ lab_gateway_wan_bridge }}, DHCP {{ lab_dhcp_range_start }}-{{ lab_dhcp_range_end }}.
-      Internet-bound traffic is NAT'd; the {{ gw_mgmt_subnet }} mgmt path is routed.
+      Internet-bound traffic is NAT'd; routed (no NAT) to:
+      {{ ([gw_mgmt_subnet] + (lab_gateway_extra_route_nets | default([]))) | join(', ') }}.
       {{ 'Control-node route to ' ~ lab_subnet ~ '.0/' ~ lab_netmask ~ ' via ' ~ gw_wan_ip ~ ' is in place.'
          if gw_route.rc == 0
-         else ('ADD THIS ROUTE on the control node (needs sudo): sudo ip route replace '
-               ~ lab_subnet ~ '.0/' ~ lab_netmask ~ ' via ' ~ gw_wan_ip) }}
+         else ('NEEDED: route ' ~ lab_subnet ~ '.0/' ~ lab_netmask ~ ' via ' ~ gw_wan_ip
+               ~ ' — add it on your control host if it is on the ' ~ gw_mgmt_subnet
+               ~ ' LAN, otherwise on the router between your control host and that LAN'
+               ~ ' (and add the control host subnet to lab_gateway_extra_route_nets).') }}

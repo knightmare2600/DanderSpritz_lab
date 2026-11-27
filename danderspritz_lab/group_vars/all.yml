@@ -119,6 +119,11 @@ lab_gateway_memory: 512
 lab_gateway_rootfs_gb: 2
 lab_dhcp_range_start: "192.168.40.100"   # DHCP pool, kept clear of the static .2/.3/.4
 lab_dhcp_range_end: "192.168.40.150"
+# Internal networks the lab is reached FROM that are NOT the gateway's own mgmt
+# subnet — excluded from NAT so their return path isn't masqueraded. Add your
+# control host's subnet here when it's routed (a different LAN) rather than on
+# the gateway's WAN segment, e.g. ["192.168.69.0/24"].
+lab_gateway_extra_route_nets: []
 
 # VLAN id for 'tagged' mode (e.g. 40). Ignored in the other modes.
 lab_vlan: ""
