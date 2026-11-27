@@ -25,6 +25,32 @@
       ansible.builtin.command: "pvesh set /nodes/{{ proxmox_node }}/network"
       changed_when: true
 
+# The gateway container owns {{ lab_gateway }}. If the bridge already carries
+# that IP on the HOST (e.g. created earlier in managed mode), both the host and
+# the container claim it -> ARP conflict, broken route-out. Strip it from the
+# host (runtime); persist by clearing the bridge's CIDR in the node's network
+# config (see the warning below).
+- name: "gw | check the lab bridge for a stray host IP"
+  ansible.builtin.command: "ip -4 addr show dev {{ proxmox_lab_bridge }}"
+  register: gw_bridge_addr
+  changed_when: false
+
+- name: "gw | remove the stray host IP from {{ proxmox_lab_bridge }} (container owns it)"
+  when: ('inet ' ~ lab_gateway ~ '/') in gw_bridge_addr.stdout
+  block:
+    - name: "gw | delete the address from the live bridge"
+      ansible.builtin.command: "ip addr del {{ lab_gateway }}/{{ lab_netmask }} dev {{ proxmox_lab_bridge }}"
+      changed_when: true
+
+    - name: "gw | warn to clear it from the node's persistent network config"
+      ansible.builtin.debug:
+        msg: >-
+          Removed {{ lab_gateway }} from {{ proxmox_lab_bridge }} on the host (it
+          conflicted with the gateway container). This is runtime only — also
+          clear the bridge's CIDR/Gateway in the node's network config (GUI:
+          node → System → Network → {{ proxmox_lab_bridge }}, or
+          /etc/network/interfaces) so a reboot/ifreload doesn't re-add it.
+
 # --- Debian LXC template ----------------------------------------------------
 - name: "gw | refresh the appliance template catalogue"
   ansible.builtin.command: pveam update
