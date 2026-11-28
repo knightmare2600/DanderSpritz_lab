@@ -40,6 +40,16 @@
     ps_scripts:
       - "WinDC\\Create-domain.ps1"
 
+# Promotion migrates the local `vagrant` account into AD, so from here every
+# task must authenticate as a DOMAIN account (WINDOMAIN\vagrant), same password.
+# set_fact changes ansible_user for the rest of this play on this host, so the
+# reboot below and the post-promotion steps reconnect with domain creds. (On a
+# re-run against an ALREADY-promoted DC, pass -e ansible_user='windomain\vagrant'
+# too, since common_windows connects before this point.)
+- name: "DC | switch the connection to the domain account (post-promotion)"
+  ansible.builtin.set_fact:
+    ansible_user: "{{ lab_netbios }}\\{{ lab_admin_user }}"
+
 - name: "DC | reboot after promotion (slow - forest creation)"
   ansible.windows.win_reboot:
     reboot_timeout: 1800
