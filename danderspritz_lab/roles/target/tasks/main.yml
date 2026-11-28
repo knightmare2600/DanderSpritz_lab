@@ -19,84 +19,101 @@
     executable: cmd
   changed_when: true
 
-# --- Pre-SP1 prerequisite hotfixes ------------------------------------------
-- name: "Target | prerequisite KBs"
-  ansible.builtin.include_role:
-    name: common_windows
-    tasks_from: run_ps_scripts
-  vars:
-    ps_scripts:
-      - "Target\\Install-KB2454826.ps1"
-      - "Target\\Install-KB2534366.ps1"
-      - "Target\\Install-KB2533552.ps1"
+# --- Service Pack level ------------------------------------------------------
+# With a Windows 7 SP1 ISO the box is already SP1, so the whole prereq-KB -> SP1
+# -> reboot chain below is redundant and is skipped. (A Win7 SP1 box still has
+# unpatched SMBv1, so EternalBlue is unaffected — do NOT add Windows Update.)
+- name: "Target | detect the Service Pack level"
+  ansible.windows.win_shell: "(Get-CimInstance Win32_OperatingSystem).ServicePackMajorVersion"
+  register: _target_sp
+  changed_when: false
 
-- name: "Target | reboot after prerequisite KBs"
-  ansible.windows.win_reboot:
-    reboot_timeout: 900
+- name: "Target | record whether SP1 is already present"
+  ansible.builtin.set_fact:
+    _target_is_sp1: "{{ (_target_sp.stdout | trim | int) >= 1 }}"
 
-# --- Service Pack 1 (long) --------------------------------------------------
-# Microsoft removed the original KB976932 download. Acquire SP1 into
-# C:\Windows\Temp\KB976932-X64.exe the cheapest safe way: from the tools CD if
-# one is attached (rebuilt target), else download it from sp1_url (Internet
-# Archive) directly on the guest. EITHER way the file is SHA-256-verified before
-# install, so a truncated/garbled copy is caught here, not installed. Override
-# sp1_url with a LAN HTTP URL to serve a vendored copy from the control node and
-# skip the ~900 MB pull over the lab NAT.
-- name: "Target | stage Win7 SP1 from the tools CD (if attached)"
-  ansible.windows.win_shell: |
-    $src = Get-PSDrive -PSProvider FileSystem |
-      ForEach-Object { Join-Path $_.Root '{{ sp1_file_name }}' } |
-      Where-Object { Test-Path $_ } | Select-Object -First 1
-    if ($src) { Copy-Item -LiteralPath $src -Destination 'C:\Windows\Temp\KB976932-X64.exe' -Force; "staged SP1 from CD" }
-    else { "SP1 not on CD" }
-  register: _sp1_cd
-  changed_when: "'staged SP1 from CD' in _sp1_cd.stdout"
+# --- Pre-SP1 prerequisite hotfixes + Service Pack 1 (only if NOT already SP1) -
+- name: "Target | prerequisite KBs + Service Pack 1"
+  when: not (_target_is_sp1 | bool)
+  block:
+    - name: "Target | prerequisite KBs"
+      ansible.builtin.include_role:
+        name: common_windows
+        tasks_from: run_ps_scripts
+      vars:
+        ps_scripts:
+          - "Target\\Install-KB2454826.ps1"
+          - "Target\\Install-KB2534366.ps1"
+          - "Target\\Install-KB2533552.ps1"
 
-- name: "Target | is SP1 present after CD staging?"
-  ansible.windows.win_stat:
-    path: 'C:\Windows\Temp\KB976932-X64.exe'
-  register: _sp1_staged
+    - name: "Target | reboot after prerequisite KBs"
+      ansible.windows.win_reboot:
+        reboot_timeout: 900
 
-- name: "Target | download Win7 SP1 (checksum-verified) if not on the CD"
-  ansible.windows.win_get_url:
-    url: "{{ sp1_url }}"
-    dest: 'C:\Windows\Temp\KB976932-X64.exe'
-    checksum: "{{ sp1_sha256 }}"
-    checksum_algorithm: sha256
-    timeout: 600
-  when: not _sp1_staged.stat.exists
+    # Microsoft removed the original KB976932 download. Acquire SP1 into
+    # C:\Windows\Temp\KB976932-X64.exe from the tools CD if attached, else
+    # download it from sp1_url (Internet Archive). EITHER way it is SHA-256
+    # verified before install. (With a SP1 ISO this whole block is skipped.)
+    - name: "Target | stage Win7 SP1 from the tools CD (if attached)"
+      ansible.windows.win_shell: |
+        $src = Get-PSDrive -PSProvider FileSystem |
+          ForEach-Object { Join-Path $_.Root '{{ sp1_file_name }}' } |
+          Where-Object { Test-Path $_ } | Select-Object -First 1
+        if ($src) { Copy-Item -LiteralPath $src -Destination 'C:\Windows\Temp\KB976932-X64.exe' -Force; "staged SP1 from CD" }
+        else { "SP1 not on CD" }
+      register: _sp1_cd
+      changed_when: "'staged SP1 from CD' in _sp1_cd.stdout"
 
-- name: "Target | verify the SP1 installer SHA-256 (CD or download)"
-  ansible.windows.win_stat:
-    path: 'C:\Windows\Temp\KB976932-X64.exe'
-    get_checksum: true
-    checksum_algorithm: sha256
-  register: _sp1_final
+    - name: "Target | is SP1 present after CD staging?"
+      ansible.windows.win_stat:
+        path: 'C:\Windows\Temp\KB976932-X64.exe'
+      register: _sp1_staged
 
-- name: "Target | SP1 installer must match the expected SHA-256"
-  ansible.builtin.assert:
-    that:
-      - _sp1_final.stat.exists
-      - _sp1_final.stat.checksum == sp1_sha256
-    fail_msg: >-
-      C:\Windows\Temp\KB976932-X64.exe SHA-256 is
-      {{ _sp1_final.stat.checksum | default('(file missing)') }}, expected
-      {{ sp1_sha256 }}. The vendored/downloaded SP1 is wrong or corrupt — do not
-      install it. Re-fetch from {{ sp1_url }} and confirm the hash.
-    quiet: true
+    - name: "Target | download Win7 SP1 (checksum-verified) if not on the CD"
+      ansible.windows.win_get_url:
+        url: "{{ sp1_url }}"
+        dest: 'C:\Windows\Temp\KB976932-X64.exe'
+        checksum: "{{ sp1_sha256 }}"
+        checksum_algorithm: sha256
+        timeout: 600
+      when: not _sp1_staged.stat.exists
 
-- name: "Target | install SP1"
-  ansible.builtin.include_role:
-    name: common_windows
-    tasks_from: run_ps_scripts
-  vars:
-    ps_scripts:
-      - "Target\\Install-SP1.ps1"
+    - name: "Target | verify the SP1 installer SHA-256 (CD or download)"
+      ansible.windows.win_stat:
+        path: 'C:\Windows\Temp\KB976932-X64.exe'
+        get_checksum: true
+        checksum_algorithm: sha256
+      register: _sp1_final
 
-- name: "Target | reboot after SP1 (can be very slow)"
-  ansible.windows.win_reboot:
-    reboot_timeout: 2400
-    post_reboot_delay: 120
+    - name: "Target | SP1 installer must match the expected SHA-256"
+      ansible.builtin.assert:
+        that:
+          - _sp1_final.stat.exists
+          - _sp1_final.stat.checksum == sp1_sha256
+        fail_msg: >-
+          C:\Windows\Temp\KB976932-X64.exe SHA-256 is
+          {{ _sp1_final.stat.checksum | default('(file missing)') }}, expected
+          {{ sp1_sha256 }}. The vendored/downloaded SP1 is wrong or corrupt — do
+          not install it. Re-fetch from {{ sp1_url }} and confirm the hash.
+        quiet: true
+
+    - name: "Target | install SP1"
+      ansible.builtin.include_role:
+        name: common_windows
+        tasks_from: run_ps_scripts
+      vars:
+        ps_scripts:
+          - "Target\\Install-SP1.ps1"
+
+    - name: "Target | reboot after SP1 (can be very slow)"
+      ansible.windows.win_reboot:
+        reboot_timeout: 2400
+        post_reboot_delay: 120
+
+- name: "Target | SP1 already present (prereq + SP1 chain skipped)"
+  ansible.builtin.debug:
+    msg: "OS is already SP1 (from the ISO); skipped the prereq-KB and SP1-install chain."
+  when: _target_is_sp1 | bool
 
 # --- Post-SP1 KBs -----------------------------------------------------------
 - name: "Target | post-SP1 KBs"

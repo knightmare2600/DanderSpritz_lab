@@ -32,7 +32,8 @@ once.
    net (default `vmbr40`, see `group_vars/all.yml`). Do **not** attach a
    physical NIC / uplink you care about.
 2. **Pre-stage the ISOs** into the node's ISO storage (default `local`):
-   - Windows Server 2008 R2 eval, Windows 7 Enterprise eval, Windows 10 1507
+   - Windows Server 2008 R2 SP1 eval, Windows 7 Enterprise **SP1** (x64; build
+     7601 — SP1 is required for PowerShell 5.1, see `group_vars/all.yml`), Win 10 1507
      Enterprise eval (filenames in `lab_vms` in `group_vars/all.yml` — the same
      ISOs the old `danderspritz_lab.json` referenced).
    - `virtio-win.iso` (latest stable from the Fedora virtio-win project).

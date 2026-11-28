@@ -223,8 +223,16 @@ lab_vms:
 
   - name: target
     vmid: 941
-    iso: "7600.16385.090713-1255_x64fre_enterprise_en-us_EVAL_Eval_Enterprise-GRMCENXEVAL_EN_DVD.iso"
-    iso_sha256: "2c16c73388a5c02a0ec4cd8b9e5c14ba28b7b45d13d0c9c7d44459feecc0385f"
+    # Windows 7 Enterprise **SP1** x64 (volume-license media, build 7601). SP1 is
+    # needed because modern ansible.windows requires PowerShell 5.1, which needs
+    # WMF 5.1, which needs SP1 — a Win7 RTM (7600) ISO can't reach PS 5.1. SP1
+    # Win7 is still SMBv1-vulnerable, so EternalBlue is unaffected. Internet
+    # Archive item en_windows_7_enterprise_with_sp1_x64_dvd_u_677651 (sha1
+    # a491f985dccfb5863f31b728dddbedb2ff4df8d1, 3182604288 bytes). The w7 answer
+    # file supplies the public Enterprise KMS client key so this VL media installs
+    # unattended (grace + slmgr /rearm; no activation server).
+    iso: "en_windows_7_enterprise_with_sp1_x64_dvd_u_677651.iso"
+    iso_sha256: ""   # set to the sha256 of your downloaded ISO (sha256 check is skipped unless Ansible runs on the PVE node)
     answer_file: "7/Autounattend.xml"
     os_short: "w7"
     ostype: "win7"
