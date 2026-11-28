@@ -58,7 +58,7 @@ windows_bootstrap_tools: &bootstrap_tools
 # Win10 box uses the virtio-win qemu-ga and does not need this.
 spice_guest_tools_file: "spice-guest-tools-0.141.exe"
 spice_guest_tools_url: "https://spice-space.org/download/windows/spice-guest-tools/spice-guest-tools-0.141/spice-guest-tools-0.141.exe"
-spice_guest_tools_sha256: ""   # set after download to enforce verification
+spice_guest_tools_sha256: "b5be0754802bcd7f7fe0ccdb877f8a6224ba13a2af7d84eb087a89b3b0237da2"
 
 # DanderSpritz/FuzzBunch toolset. ~200 MB zipped — too big for the repo or LFS,
 # so build.yml downloads it once on the control node and bakes it onto the tools
@@ -238,13 +238,15 @@ lab_vms:
     vendored_tools: *bootstrap_tools  # .NET 4.5.2 + WMF 5.1, installed at first logon
     bootstrap_ps5: true      # also put bootstrap-ps5.cmd on the CD (runs the installs)
     spice_guest_tools: true  # put the SPICE guest tools (compatible qemu-ga) on the CD
-    # SP1 (vendored in tools/) is baked onto the CD so the target installs it
-    # straight off the disc — no web server, no guest download. This makes the
-    # tools ISO ~1 GB; the PVE API upload handles that, but if the upload step
-    # fails on your node, either (a) drop any -e sp1_url override so the guest
-    # pulls SP1 from the Internet Archive via the gateway instead, or (b) ask for
-    # the scp-to-node upload path (routed mode already has root SSH to the node).
-    fetch_sp1: true
+    # SP1 is NOT baked onto the CD by default. With .NET+WMF+SPICE+SP1 the tools
+    # ISO is ~1 GB, and proxmox_vm_build_dir (default /tmp) must hold the staged
+    # files AND the output ISO (~2 GB) — on a small /tmp genisoimage fails with
+    # "No space left on device". Instead the target installs SP1 at configure
+    # time via win_get_url from sp1_url, which DEFAULTS to the Internet Archive
+    # (no web server needed; it downloads via the gateway). Point sp1_url at a LAN
+    # HTTP URL only if you want it faster/local. To bake SP1 onto the CD anyway,
+    # set fetch_sp1: true AND -e proxmox_vm_build_dir=/some/disk/with/a/few/GB.
+    fetch_sp1: false
 
   - name: danderspritz
     vmid: 942
