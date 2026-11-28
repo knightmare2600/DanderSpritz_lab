@@ -149,6 +149,15 @@
     ps_scripts:
       - "Install-Chocolatey.ps1"
 
+# Chocolatey adds C:\ProgramData\chocolatey\bin to the machine PATH, but the
+# running WinRM service captured its environment at boot, so shells it spawns
+# for later tasks/plays do NOT see choco on PATH until WinRM is restarted. A
+# reboot is the reliable way to refresh that, so the target's KB/tool installs
+# and danderspritz's Install-Git (all call choco.exe) can find it.
+- name: "Reboot so Chocolatey is on PATH for later WinRM sessions"
+  ansible.windows.win_reboot:
+    reboot_timeout: 900
+
 # --- Re-arm the trial licence (buys another 90 days) ------------------------
 - name: "slmgr /rearm (best effort)"
   ansible.windows.win_shell: "cscript //nologo C:\\Windows\\System32\\slmgr.vbs /rearm"
