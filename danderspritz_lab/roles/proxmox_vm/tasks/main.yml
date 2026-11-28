@@ -27,6 +27,14 @@
   when: (vm_existing.proxmox_vms | default([]) | length) == 0
   block:
     # --- Build the answer-file ISO on the control node --------------------
+    # Wipe any stale per-VM build dir first: a previous (failed) run can leave
+    # large staged files behind (e.g. an SP1 copy), which would otherwise be
+    # baked into this run's ISO and refill the disk.
+    - name: "{{ vm.name }} | clean any stale build dir from a previous run"
+      ansible.builtin.file:
+        path: "{{ proxmox_vm_build_dir }}/{{ vm.name }}"
+        state: absent
+
     - name: "{{ vm.name }} | local work dir"
       ansible.builtin.file:
         path: "{{ proxmox_vm_build_dir }}/{{ vm.name }}/iso_root"
