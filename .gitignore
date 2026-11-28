@@ -21,3 +21,7 @@ tools/Win7AndW2K8R2-KB3191566-x64.msu
 tools/spice-guest-tools-0.141.exe
 # WMF ships as a .zip that prep.yml downloads to a tempdir; ignore any stray copy.
 tools/Win7AndW2K8R2-KB3191566-x64.zip
+
+# ISO build scratch (answer-file + tools ISOs; the target's is ~1 GB). Built here
+# under tools/ because it needs a few GB, which /tmp often lacks.
+tools/.build/

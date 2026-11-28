@@ -1,36 +1,42 @@
 @echo off
 rem ---------------------------------------------------------------------------
-rem PowerShell 5.1 bootstrap for a cold Windows 7 / Server 2008 R2 box (PS 2.0),
-rem run from the tools CD at first logon. Modern ansible.windows requires PS 5.1,
-rem so this installs .NET 4.5.2 then WMF 5.1 (both sit next to this script, so
-rem %~dp0 locates them with no drive-letter guessing), then reboots. On the next
-rem boot the box runs PS 5.1 and Ansible can manage it.
+rem PowerShell 5.1 bootstrap, run from the tools CD at first logon. Modern
+rem ansible.windows needs PS 5.1 -> WMF 5.1 -> .NET 4.5.2.
 rem
-rem UI: .NET uses /passive (a progress window, still unattended) so whoever is
-rem watching the Proxmox console sees activity. wusa (WMF) has no progress-only
-rem mode -- /quiet is silent and a non-quiet install would STOP for a click and
-rem hang this unattended logon -- so WMF stays /quiet with echo feedback instead.
-rem Re-running is harmless: both installers no-op if already applied.
+rem On Windows 7 RTM, WMF 5.1 is "not applicable" until SP1 is installed AND the
+rem box has rebooted, so RTM takes a TWO-PHASE path:
+rem   phase 1 (this script): stage installers to C:, arm a RunOnce for phase 2,
+rem            install SP1, reboot.
+rem   phase 2 (bootstrap-ps5-phase2.cmd, via that RunOnce after the SP1 reboot):
+rem            install .NET 4.5.2 + WMF 5.1, reboot -> PS 5.1.
+rem A box already at SP1 (Server 2008 R2 SP1) skips SP1 and runs phase 2 inline.
+rem
+rem Installers are copied to C:\Windows\Temp so phase 2 needs neither the CD
+rem drive letter nor it staying the same across the reboot. %~dp0 = this CD.
 rem ---------------------------------------------------------------------------
+setlocal
+set "T=C:\Windows\Temp"
 
-echo.
-echo ============================================================
-echo   DanderSpritz lab - PowerShell 5.1 bootstrap
-echo   Windows 7 / Server 2008 R2 ships PS 2.0; installing the
-echo   prerequisites now. This takes several minutes - please wait.
-echo ============================================================
-echo.
+echo [bootstrap] Staging installers to %T% ...
+copy /y "%~dp0NDP452-KB2901907-x86-x64-AllOS-ENU.exe" "%T%\" >nul
+copy /y "%~dp0Win7AndW2K8R2-KB3191566-x64.msu" "%T%\" >nul
+copy /y "%~dp0bootstrap-ps5-phase2.cmd" "%T%\" >nul
 
-echo [1/2] Installing .NET Framework 4.5.2 (a progress window will appear) ...
-start /wait "" "%~dp0NDP452-KB2901907-x86-x64-AllOS-ENU.exe" /passive /norestart
-echo       .NET Framework 4.5.2 install finished.
-echo.
+rem Already Service Pack 1? (Win7 SP1 or Server 2008 R2 SP1 report it here.)
+reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion" /v CSDVersion 2>nul | find "Service Pack 1" >nul
+if not errorlevel 1 goto havesp1
 
-echo [2/2] Installing WMF 5.1 / PowerShell 5.1 via wusa (silent - wusa has no
-echo       progress-only mode; this runs a few minutes with no window) ...
-start /wait "" "wusa.exe" "%~dp0Win7AndW2K8R2-KB3191566-x64.msu" /quiet /norestart
-echo       WMF 5.1 install finished.
-echo.
+echo [bootstrap] Windows 7 RTM detected - installing SP1 first (phase 1 of 2).
+echo [bootstrap] PowerShell 5.1 installs automatically after the SP1 reboot.
+reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce" /v DszPs5Phase2 /t REG_SZ /d "%T%\bootstrap-ps5-phase2.cmd" /f >nul
+start /wait "" "%~dp0windows6.1-KB976932-X64.exe" /quiet /nodialog /norestart
+echo [bootstrap] SP1 staged; rebooting to finalise it (this boot is slow) ...
+shutdown /r /t 30 /c "Installing Windows 7 SP1 (phase 1 of 2)"
+goto end
 
-echo Rebooting in 30s to activate PowerShell 5.1 ...
-shutdown /r /t 30 /c "Activating PowerShell 5.1 (DanderSpritz lab bootstrap)"
+:havesp1
+echo [bootstrap] SP1 already present - installing PowerShell 5.1 now.
+call "%T%\bootstrap-ps5-phase2.cmd"
+
+:end
+endlocal

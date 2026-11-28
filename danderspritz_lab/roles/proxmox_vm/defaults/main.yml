@@ -1,6 +1,10 @@
 ---
-# Local working area on the control node for building per-VM answer-file ISOs.
-proxmox_vm_build_dir: "/tmp/danderspritz_lab_build"
+# Local working area on the control node for building the per-VM answer-file and
+# tools ISOs. Under tools/ (a roomy repo dir), NOT /tmp: the target's tools ISO
+# carries SP1 and is ~1 GB, which needs a couple of GB of staging+output space
+# that a small /tmp does not have (genisoimage fails "No space left on device").
+# Override with -e proxmox_vm_build_dir=/some/path if you want it elsewhere.
+proxmox_vm_build_dir: "{{ tools_dir }}/.build"
 
 # Candidate drive letters for the virtio-win CD during the windowsPE pass. With
 # four optical drives attached (install + unattend + tools + virtio), WinPE's

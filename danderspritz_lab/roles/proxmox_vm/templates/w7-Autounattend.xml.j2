@@ -33,14 +33,9 @@
                 <Organization>Vagrant Inc.</Organization>
                 <!-- Product Key from http://technet.microsoft.com/en-us/library/jj612867.aspx -->
                 <ProductKey>
-                    <!-- The target now uses Windows 7 Enterprise SP1 *volume-license*
-                         media, which (unlike the old trial ISO) needs a key to
-                         install unattended. This is the PUBLIC Enterprise KMS client
-                         setup key (not a licence): it identifies the edition so Setup
-                         proceeds with no prompt. No activation server is contacted;
-                         the box runs on the grace period + slmgr /rearm. If you swap
-                         back to a trial/eval ISO, comment this Key out again. -->
-                    <Key>33PXH-7Y6KF-2VJC9-XBBR8-HVTHH</Key>
+                    <!-- Do not uncomment the Key element if you are using trial ISOs -->
+                    <!-- You must uncomment the Key element (and optionally insert your own key) if you are using retail or volume license ISOs -->
+                    <!--<Key>33PXH-7Y6KF-2VJC9-XBBR8-HVTHH</Key>-->
                     <WillShowUI>Never</WillShowUI>
                 </ProductKey>
             </UserData>

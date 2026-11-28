@@ -97,12 +97,15 @@
         # The PS 5.1 bootstrap batch (runs the .NET + WMF installs from the CD at
         # first logon). Kept as a CD batch file rather than inline answer-file
         # PowerShell, which proved unreliable in FirstLogonCommands.
-        - name: "{{ vm.name }} | add the PS 5.1 bootstrap script to the tools ISO root"
+        - name: "{{ vm.name }} | add the PS 5.1 bootstrap scripts to the tools ISO root"
           ansible.builtin.copy:
-            src: "{{ role_path }}/files/bootstrap-ps5.cmd"
-            dest: "{{ proxmox_vm_build_dir }}/{{ vm.name }}/tools_root/bootstrap-ps5.cmd"
+            src: "{{ role_path }}/files/{{ item }}"
+            dest: "{{ proxmox_vm_build_dir }}/{{ vm.name }}/tools_root/{{ item }}"
             remote_src: true
             mode: "0644"
+          loop:
+            - bootstrap-ps5.cmd
+            - bootstrap-ps5-phase2.cmd
           when: vm.bootstrap_ps5 | default(false)
 
         # SPICE guest tools (a qemu-ga that runs on 2008 R2 / Win7). Optional, so

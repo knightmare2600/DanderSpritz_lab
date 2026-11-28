@@ -102,7 +102,7 @@ vendored in `tools/` and installed **at first logon** from each box's tools CD
 | Host | Full ISO filename |
 |------|-------------------|
 | DC (Server 2008 R2 SP1, x64) | `7601.17514.101119-1850_x64fre_server_eval_en-us-GRMSXEVAL_EN_DVD.iso` |
-| Target (Windows 7 Enterprise **SP1**, x64) | `en_windows_7_enterprise_with_sp1_x64_dvd_u_677651.iso` (Internet Archive; sha1 `a491f985…`). SP1 is required so the box can reach PowerShell 5.1 (WMF 5.1 needs SP1); RTM 7600 cannot. VL media — the `w7` answer file supplies the public Enterprise KMS client key to install unattended. |
+| Target (Windows 7 Enterprise RTM, x64) | `7600.16385.090713-1255_x64fre_enterprise_en-us_EVAL_Eval_Enterprise-GRMCENXEVAL_EN_DVD.iso` — SP1 is **installed as the first bootstrap step** from the tools CD (`fetch_sp1: true`), because WMF 5.1 / PowerShell 5.1 need SP1: bootstrap-ps5.cmd does SP1 → reboot → .NET/WMF → reboot. |
 | DanderSpritz (Windows 10 1507 Enterprise Eval, x64) | `10240.16384.150709-1700.TH1_CLIENTENTERPRISEEVAL_OEMRET_X64FRE_EN-US.ISO` |
 
 These are **not** vendored into the repo (licensing + size); stage them into

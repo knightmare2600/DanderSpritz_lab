@@ -223,16 +223,8 @@ lab_vms:
 
   - name: target
     vmid: 941
-    # Windows 7 Enterprise **SP1** x64 (volume-license media, build 7601). SP1 is
-    # needed because modern ansible.windows requires PowerShell 5.1, which needs
-    # WMF 5.1, which needs SP1 — a Win7 RTM (7600) ISO can't reach PS 5.1. SP1
-    # Win7 is still SMBv1-vulnerable, so EternalBlue is unaffected. Internet
-    # Archive item en_windows_7_enterprise_with_sp1_x64_dvd_u_677651 (sha1
-    # a491f985dccfb5863f31b728dddbedb2ff4df8d1, 3182604288 bytes). The w7 answer
-    # file supplies the public Enterprise KMS client key so this VL media installs
-    # unattended (grace + slmgr /rearm; no activation server).
-    iso: "en_windows_7_enterprise_with_sp1_x64_dvd_u_677651.iso"
-    iso_sha256: ""   # set to the sha256 of your downloaded ISO (sha256 check is skipped unless Ansible runs on the PVE node)
+    iso: "7600.16385.090713-1255_x64fre_enterprise_en-us_EVAL_Eval_Enterprise-GRMCENXEVAL_EN_DVD.iso"
+    iso_sha256: "2c16c73388a5c02a0ec4cd8b9e5c14ba28b7b45d13d0c9c7d44459feecc0385f"
     answer_file: "7/Autounattend.xml"
     os_short: "w7"
     ostype: "win7"
@@ -246,15 +238,13 @@ lab_vms:
     vendored_tools: *bootstrap_tools  # .NET 4.5.2 + WMF 5.1, installed at first logon
     bootstrap_ps5: true      # also put bootstrap-ps5.cmd on the CD (runs the installs)
     spice_guest_tools: true  # put the SPICE guest tools (compatible qemu-ga) on the CD
-    # SP1 is NOT baked onto the CD by default. With .NET+WMF+SPICE+SP1 the tools
-    # ISO is ~1 GB, and proxmox_vm_build_dir (default /tmp) must hold the staged
-    # files AND the output ISO (~2 GB) — on a small /tmp genisoimage fails with
-    # "No space left on device". Instead the target installs SP1 at configure
-    # time via win_get_url from sp1_url, which DEFAULTS to the Internet Archive
-    # (no web server needed; it downloads via the gateway). Point sp1_url at a LAN
-    # HTTP URL only if you want it faster/local. To bake SP1 onto the CD anyway,
-    # set fetch_sp1: true AND -e proxmox_vm_build_dir=/some/disk/with/a/few/GB.
-    fetch_sp1: false
+    # SP1 (vendored in tools/) is baked onto the target CD and installed as the
+    # FIRST bootstrap step: this is Win7 RTM (7600), and WMF 5.1 / PowerShell 5.1
+    # only apply once SP1 is in and the box has rebooted — so bootstrap-ps5.cmd
+    # does SP1 -> reboot -> .NET + WMF -> reboot. SP1 on the CD makes the tools
+    # ISO ~1 GB, which is why proxmox_vm_build_dir is a roomy repo dir, not /tmp
+    # (see roles/proxmox_vm/defaults/main.yml).
+    fetch_sp1: true
 
   - name: danderspritz
     vmid: 942
