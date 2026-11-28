@@ -6,17 +6,31 @@ rem so this installs .NET 4.5.2 then WMF 5.1 (both sit next to this script, so
 rem %~dp0 locates them with no drive-letter guessing), then reboots. On the next
 rem boot the box runs PS 5.1 and Ansible can manage it.
 rem
-rem This lives on the CD as a batch file ON PURPOSE: the earlier inline
-rem `cmd /c powershell -Command "...| ... | ..."` in the answer file did not run
-rem reliably (pipe/quote handling in FirstLogonCommands). A plain .cmd avoids it.
+rem UI: .NET uses /passive (a progress window, still unattended) so whoever is
+rem watching the Proxmox console sees activity. wusa (WMF) has no progress-only
+rem mode -- /quiet is silent and a non-quiet install would STOP for a click and
+rem hang this unattended logon -- so WMF stays /quiet with echo feedback instead.
 rem Re-running is harmless: both installers no-op if already applied.
 rem ---------------------------------------------------------------------------
 
-echo [bootstrap] Installing .NET Framework 4.5.2 (WMF 5.1 prerequisite) ...
-start /wait "" "%~dp0NDP452-KB2901907-x86-x64-AllOS-ENU.exe" /q /norestart
+echo.
+echo ============================================================
+echo   DanderSpritz lab - PowerShell 5.1 bootstrap
+echo   Windows 7 / Server 2008 R2 ships PS 2.0; installing the
+echo   prerequisites now. This takes several minutes - please wait.
+echo ============================================================
+echo.
 
-echo [bootstrap] Installing WMF 5.1 / PowerShell 5.1 ...
+echo [1/2] Installing .NET Framework 4.5.2 (a progress window will appear) ...
+start /wait "" "%~dp0NDP452-KB2901907-x86-x64-AllOS-ENU.exe" /passive /norestart
+echo       .NET Framework 4.5.2 install finished.
+echo.
+
+echo [2/2] Installing WMF 5.1 / PowerShell 5.1 via wusa (silent - wusa has no
+echo       progress-only mode; this runs a few minutes with no window) ...
 start /wait "" "wusa.exe" "%~dp0Win7AndW2K8R2-KB3191566-x64.msu" /quiet /norestart
+echo       WMF 5.1 install finished.
+echo.
 
-echo [bootstrap] Rebooting in 30s to activate PowerShell 5.1 ...
+echo Rebooting in 30s to activate PowerShell 5.1 ...
 shutdown /r /t 30 /c "Activating PowerShell 5.1 (DanderSpritz lab bootstrap)"
