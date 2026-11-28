@@ -181,6 +181,24 @@
             mode: "0644"
           when: vm.fetch_sp1 | default(false)
 
+        # Is the tools ISO already in the node's ISO storage? A large tools ISO
+        # (the target's carries SP1, ~1 GB) can be too big for the PVE API's
+        # in-memory upload, so it may have been placed on the node by hand (scp
+        # tools/.build/<vm>-tools.iso to the ISO dir). If it is already there,
+        # skip building + uploading it and just use it.
+        - name: "{{ vm.name }} | is the tools ISO already in {{ proxmox_iso_storage }}?"
+          ansible.builtin.uri:
+            url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/storage/{{ proxmox_iso_storage }}/content?content=iso"
+            method: GET
+            headers: "{{ _pve_get_headers }}"
+            validate_certs: "{{ proxmox_validate_certs }}"
+          register: _tools_iso_list
+          no_log: true
+
+        - name: "{{ vm.name }} | record whether the tools ISO is already present"
+          ansible.builtin.set_fact:
+            _tools_iso_present: "{{ (vm.name ~ '-tools.iso') in (_tools_iso_list.json.data | map(attribute='volid') | map('regex_replace', '^.*/', '') | list) }}"
+
         - name: "{{ vm.name }} | build the tools ISO"
           ansible.builtin.command:
             cmd: >-
@@ -188,6 +206,7 @@
               -o {{ proxmox_vm_build_dir }}/{{ vm.name }}-tools.iso
               {{ proxmox_vm_build_dir }}/{{ vm.name }}/tools_root
           changed_when: true
+          when: not (_tools_iso_present | bool)
 
         - name: "{{ vm.name }} | upload tools ISO to {{ proxmox_iso_storage }}"
           ansible.builtin.command:
@@ -201,6 +220,7 @@
           register: _tools_upload
           no_log: true
           changed_when: true
+          when: not (_tools_iso_present | bool)
 
         # The upload endpoint returns a task id (UPID) and copies the (large)
         # file into storage asynchronously. Wait for THAT task to finish — a
@@ -216,6 +236,7 @@
           retries: 60
           delay: 5
           no_log: true
+          when: not (_tools_iso_present | bool)
 
         - name: "{{ vm.name }} | the tools ISO upload task must have succeeded"
           ansible.builtin.assert:
@@ -224,10 +245,12 @@
             fail_msg: >-
               The tools ISO upload task did not succeed
               (exitstatus={{ _tools_task.json.data.exitstatus | default('unknown') }}).
-              A ~240MB upload through the PVE API can be unreliable; consider
-              fetch_eqgrp=false (smaller CD, guest clones the toolset) or staging
-              the ISO on the node another way.
+              A large upload through the PVE API can be unreliable; for the ~1 GB
+              target tools ISO, scp tools/.build/{{ vm.name }}-tools.iso to the
+              node's ISO dir (e.g. /var/lib/vz/template/iso/) and re-run — the
+              build then skips the upload.
             quiet: true
+          when: not (_tools_iso_present | bool)
 
     # The upload API returns as soon as curl's request is accepted, but a large
     # volume (the tools ISO) can take a moment to register in storage. Wait for
