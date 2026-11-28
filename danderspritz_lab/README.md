@@ -53,6 +53,21 @@ once.
 Set the real `proxmox_api_host`, `proxmox_node`, storage names and IPs in
 `group_vars/all.yml`.
 
+## Preflight asset prep (one-time)
+
+The large vendored installers aren't in the repo. Fetch them all into `tools/`
+once, from the known-good URLs, each SHA-256-verified:
+
+```bash
+ansible-playbook prep.yml
+```
+
+This pulls Windows 7 SP1 (from the Internet Archive — Microsoft removed it),
+.NET 4.5.2, WMF 5.1 (PowerShell 5.1), and the SPICE guest tools (a qemu-ga that
+runs on 2008 R2 / Win7). `jre-6u21`, `python-2.6.6` and `pywin32-221` are already
+committed; the EQGRP/DanderSpritz zip is still fetched at build time. Re-running
+is cheap — present, correctly-named files are left alone.
+
 ## Running
 
 ```bash

@@ -129,7 +129,29 @@
     - qemu_ga_install is defined
     - (qemu_ga_install.rc | default(0)) != 0
 
-- name: "Ensure the QEMU-GA service is running (if the agent installed)"
+# Fallback for 2008 R2 / Win7, where the virtio-win qemu-ga will not run: the
+# SPICE guest tools bundle a compatible qemu-ga. Install it (silent) only if the
+# virtio agent failed and the installer is on an attached CD. Best-effort.
+- name: "Look for the SPICE guest tools on any attached CD"
+  ansible.windows.win_shell: |
+    $e = Get-PSDrive -PSProvider FileSystem |
+      ForEach-Object { Join-Path $_.Root '{{ spice_guest_tools_file }}' } |
+      Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($e) { $e } else { '' }
+  register: spice_exe
+  changed_when: false
+  when: (qemu_ga_install.rc | default(0)) != 0
+
+- name: "Install SPICE guest tools (compatible qemu-ga for old Windows)"
+  ansible.windows.win_shell: |
+    Start-Process -FilePath '{{ spice_exe.stdout | default("") | trim }}' -ArgumentList '/S' -Wait
+  when:
+    - (qemu_ga_install.rc | default(0)) != 0
+    - (spice_exe.stdout | default('') | trim) | length > 0
+  changed_when: true
+  failed_when: false
+
+- name: "Ensure the QEMU-GA service is running (if an agent installed)"
   ansible.windows.win_service:
     name: QEMU-GA
     state: started

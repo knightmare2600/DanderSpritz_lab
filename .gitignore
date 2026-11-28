@@ -16,3 +16,8 @@ tools/windows6.1-KB976932-X64.exe
 # .NET 4.5.2 (~69 MB) and WMF 5.1 (~80 MB). Never committed.
 tools/NDP452-KB2901907-x86-x64-AllOS-ENU.exe
 tools/Win7AndW2K8R2-KB3191566-x64.msu
+
+# SPICE guest tools (qemu-ga compatible with 2008 R2 / Win7) - vendored locally.
+tools/spice-guest-tools-0.141.exe
+# WMF ships as a .zip that prep.yml downloads to a tempdir; ignore any stray copy.
+tools/Win7AndW2K8R2-KB3191566-x64.zip

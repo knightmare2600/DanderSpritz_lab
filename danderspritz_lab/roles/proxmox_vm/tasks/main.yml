@@ -97,6 +97,24 @@
             mode: "0644"
           when: vm.bootstrap_ps5 | default(false)
 
+        # SPICE guest tools (a qemu-ga that runs on 2008 R2 / Win7). Optional, so
+        # only staged if the installer is actually vendored in tools/.
+        - name: "{{ vm.name }} | is the SPICE guest tools installer vendored?"
+          ansible.builtin.stat:
+            path: "{{ tools_dir }}/{{ spice_guest_tools_file }}"
+          register: _spice_stat
+          when: vm.spice_guest_tools | default(false)
+
+        - name: "{{ vm.name }} | add the SPICE guest tools to the tools ISO root"
+          ansible.builtin.copy:
+            src: "{{ tools_dir }}/{{ spice_guest_tools_file }}"
+            dest: "{{ proxmox_vm_build_dir }}/{{ vm.name }}/tools_root/{{ spice_guest_tools_file }}"
+            remote_src: true
+            mode: "0644"
+          when:
+            - vm.spice_guest_tools | default(false)
+            - _spice_stat.stat.exists | default(false)
+
         # The DanderSpritz toolset (EQGRP) and Win7 SP1 are too big for the repo:
         # fetch them once (cached) on the control node and bake them onto the CD.
         - name: "{{ vm.name }} | ensure the download cache dir exists"

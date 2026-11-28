@@ -1,0 +1,119 @@
+---
+# Preflight asset prep — run ONCE on the control node before build.yml:
+#
+#   ansible-playbook prep.yml
+#
+# Downloads the large vendored installers into ../tools/ from the known-good
+# URLs (recorded in group_vars/all.yml), each SHA-256-verified, so the rest of
+# the lab builds without every guest fetching from the internet — and so SP1,
+# which Microsoft removed, comes from the Internet Archive snapshot.
+#
+# What it fetches:
+#   - Windows 7 SP1 (KB976932)            -> tools/ (sp1_url)
+#   - .NET 4.5.2 offline                  -> tools/ (bootstrap)
+#   - WMF 5.1 / PowerShell 5.1 (from zip) -> tools/ (bootstrap, member extracted)
+#   - SPICE guest tools (qemu-ga for 7/2008R2) -> tools/
+#
+# Already in the repo (committed, small): jre-6u21, python-2.6.6, pywin32-221.
+# Still fetched at build time (too big to vendor): the EQGRP/DanderSpritz zip.
+#
+# force: false means an already-present, correctly-named file is left alone, so
+# re-running is cheap and anything you vendored by hand is respected.
+
+- name: Fetch the vendored lab assets into tools/
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - "{{ lookup('ansible.builtin.first_found', ['group_vars/vault.yml'], errors='ignore') | default('group_vars/all.yml', true) }}"
+  vars:
+    # Direct single-file downloads (saved straight into tools/).
+    _prep_direct: >-
+      {{ [ {'src': sp1_file_name, 'url': sp1_url, 'sha256': sp1_sha256},
+           {'src': spice_guest_tools_file, 'url': spice_guest_tools_url, 'sha256': spice_guest_tools_sha256} ]
+         + (windows_bootstrap_tools | selectattr('zip_member', 'undefined') | list) }}
+    # Assets delivered inside a .zip (download, then extract the one member).
+    _prep_zips: "{{ windows_bootstrap_tools | selectattr('zip_member', 'defined') | list }}"
+  tasks:
+    - name: "prep | ensure the tools dir exists"
+      ansible.builtin.file:
+        path: "{{ tools_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: "prep | download direct assets (SHA-256 verified when a hash is set)"
+      ansible.builtin.get_url:
+        url: "{{ item.url }}"
+        dest: "{{ tools_dir }}/{{ item.src }}"
+        checksum: "{{ ('sha256:' ~ item.sha256) if (item.sha256 | default('') | length > 0) else omit }}"
+        force: false
+        timeout: 300
+        mode: "0644"
+      loop: "{{ _prep_direct }}"
+      loop_control:
+        label: "{{ item.src }}"
+
+    - name: "prep | fetch + extract zip-packaged assets (e.g. WMF 5.1)"
+      when: _prep_zips | length > 0
+      block:
+        - name: "prep | temp dir for the zip downloads"
+          ansible.builtin.tempfile:
+            state: directory
+          register: _zip_tmp
+
+        - name: "prep | download each zip"
+          ansible.builtin.get_url:
+            url: "{{ item.url }}"
+            dest: "{{ _zip_tmp.path }}/{{ item.src }}.zip"
+            force: false
+            timeout: 300
+            mode: "0644"
+          loop: "{{ _prep_zips }}"
+          loop_control:
+            label: "{{ item.src }}"
+
+        - name: "prep | extract just the needed member into tools/"
+          ansible.builtin.unarchive:
+            src: "{{ _zip_tmp.path }}/{{ item.src }}.zip"
+            dest: "{{ tools_dir }}"
+            include:
+              - "{{ item.zip_member }}"
+            remote_src: true
+          loop: "{{ _prep_zips }}"
+          loop_control:
+            label: "{{ item.zip_member }}"
+
+        - name: "prep | SHA-256 the extracted member"
+          ansible.builtin.stat:
+            path: "{{ tools_dir }}/{{ item.src }}"
+            checksum_algorithm: sha256
+          register: _zip_stat
+          loop: "{{ _prep_zips }}"
+          loop_control:
+            label: "{{ item.src }}"
+
+        - name: "prep | extracted member must match its SHA-256"
+          ansible.builtin.assert:
+            that:
+              - item.stat.exists
+              - (item.item.sha256 | default('') | length == 0) or (item.stat.checksum == item.item.sha256)
+            fail_msg: >-
+              {{ tools_dir }}/{{ item.item.src }} SHA-256
+              {{ item.stat.checksum | default('(missing)') }} != expected
+              {{ item.item.sha256 }} — wrong or corrupt download.
+            success_msg: "{{ item.item.src }} — extracted, SHA-256 OK"
+            quiet: true
+          loop: "{{ _zip_stat.results }}"
+          loop_control:
+            label: "{{ item.item.src }}"
+
+        - name: "prep | remove the temp zip dir"
+          ansible.builtin.file:
+            path: "{{ _zip_tmp.path }}"
+            state: absent
+
+    - name: "prep | done"
+      ansible.builtin.debug:
+        msg: >-
+          tools/ is staged. Committed-in-repo installers (jre-6u21, python-2.6.6,
+          pywin32-221) are assumed present; the EQGRP/DanderSpritz zip is still
+          fetched at build time. You can now run build.yml.
