@@ -238,12 +238,13 @@ lab_vms:
     vendored_tools: *bootstrap_tools  # .NET 4.5.2 + WMF 5.1, installed at first logon
     bootstrap_ps5: true      # also put bootstrap-ps5.cmd on the CD (runs the installs)
     spice_guest_tools: true  # put the SPICE guest tools (compatible qemu-ga) on the CD
-    # SP1 is NOT put on the CD (that would make a ~1 GB tools ISO, and the PVE API
-    # upload buffers the whole file). The target role installs SP1 later over the
-    # network via win_get_url (sp1_url) once PS 5.1 is up — set fetch_sp1: true
-    # only if you specifically want it baked onto the CD and your node can take
-    # the large upload.
-    fetch_sp1: false
+    # SP1 (vendored in tools/) is baked onto the CD so the target installs it
+    # straight off the disc — no web server, no guest download. This makes the
+    # tools ISO ~1 GB; the PVE API upload handles that, but if the upload step
+    # fails on your node, either (a) drop any -e sp1_url override so the guest
+    # pulls SP1 from the Internet Archive via the gateway instead, or (b) ask for
+    # the scp-to-node upload path (routed mode already has root SSH to the node).
+    fetch_sp1: true
 
   - name: danderspritz
     vmid: 942
